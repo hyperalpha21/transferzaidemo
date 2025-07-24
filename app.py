@@ -11,13 +11,13 @@ from pathlib import Path
 
 # Page configuration
 st.set_page_config(
-    page_title="Course Transferability Analyzer",
+    page_title="Will My Courses Transfer?",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Custom CSS - simplified and cleaner
 st.markdown("""
 <style>
 .main-header {
@@ -26,20 +26,23 @@ st.markdown("""
     text-align: center;
     margin-bottom: 2rem;
 }
-.section-header {
-    font-size: 1.5rem;
+.step-header {
+    font-size: 1.4rem;
     color: #2e8b57;
     margin-top: 2rem;
     margin-bottom: 1rem;
+    padding: 10px;
+    background-color: #f0f8f0;
+    border-radius: 8px;
 }
 .result-card {
     padding: 20px;
     border-radius: 12px;
     margin-bottom: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 .result-bar {
-    height: 15px;
+    height: 20px;
     background: #eee;
     border-radius: 10px;
     overflow: hidden;
@@ -48,6 +51,14 @@ st.markdown("""
 .result-bar-fill {
     height: 100%;
     transition: width 0.5s;
+    border-radius: 10px;
+}
+.help-text {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #17a2b8;
+    margin: 10px 0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -59,27 +70,27 @@ if 'university_courses_df' not in st.session_state:
     st.session_state.university_courses_df = None
 if 'university_embeddings' not in st.session_state:
     st.session_state.university_embeddings = None
-if 'all_comparisons' not in st.session_state:
-    st.session_state.all_comparisons = []
 if 'course_matches' not in st.session_state:
     st.session_state.course_matches = {}
-if 'instructions_visible' not in st.session_state:
-    st.session_state.instructions_visible = True
+if 'show_help' not in st.session_state:
+    st.session_state.show_help = True
 
-class CourseTransferabilityAnalyzer:
+class CourseTransferChecker:
     def __init__(self):
         self.csv_url = "wm_courses_2025.csv"
 
     @st.cache_resource
     def load_model(_self):
+        """Load the AI model that compares courses"""
         try:
             model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
             return model
         except Exception as e:
-            st.error(f"Error loading model: {str(e)}")
+            st.error(f"Could not load the comparison tool: {str(e)}")
             return None
 
     def extract_course_level(self, course_code):
+        """Figure out if a course is intro (100), intermediate (200), advanced (300), etc."""
         try:
             match = re.search(r'(\d{3,4})', course_code)
             if match:
@@ -97,220 +108,477 @@ class CourseTransferabilityAnalyzer:
             return None
 
     def calculate_level_bonus(self, course_level, target_level):
+        """Give extra points for courses at the same level"""
         if course_level is None or target_level is None:
             return 0.0
         diff = abs(course_level - target_level)
         if diff == 0:
-            return 0.15
+            return 0.15  # Same level = big bonus
         elif diff == 100:
-            return 0.12
+            return 0.12  # One level off = smaller bonus
         elif diff == 200:
-            return 0.02
+            return 0.02  # Two levels off = tiny bonus
         return 0.0
 
     def load_csv_data(self, csv_source):
+        """Load the university course catalog with better encoding handling"""
         try:
-            if csv_source == "url":
-                if Path("wm_courses_2025.csv").exists():
-                    df = pd.read_csv("wm_courses_2025.csv")
-                else:
-                    st.error("CSV file not found")
-                    return None
+            # Try different encodings to handle various CSV files
+            encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+            
+            for encoding in encodings_to_try:
+                try:
+                    if csv_source == "url":
+                        if Path("wm_courses_2025.csv").exists():
+                            df = pd.read_csv("wm_courses_2025.csv", encoding=encoding)
+                        else:
+                            st.error("Course catalog file not found. Please upload your own CSV file.")
+                            return None
+                    else:
+                        df = pd.read_csv(csv_source, encoding=encoding)
+                    
+                    # If we get here, the encoding worked
+                    st.success(f"✅ Successfully loaded CSV file (encoding: {encoding})")
+                    break
+                except UnicodeDecodeError:
+                    continue
             else:
-                df = pd.read_csv(csv_source)
-
-            required = ['course_code', 'course_title', 'course_description']
-            if any(col not in df.columns for col in required):
-                st.error("Missing required columns")
+                st.error("Could not read the CSV file. The file might be corrupted or in an unsupported format.")
                 return None
 
+            # Check for required columns
+            required = ['course_code', 'course_title', 'course_description']
+            missing_cols = [col for col in required if col not in df.columns]
+            
+            if missing_cols:
+                st.error(f"Your CSV file is missing these required columns: {', '.join(missing_cols)}")
+                st.info("Make sure your CSV has columns named: course_code, course_title, course_description")
+                return None
+
+            # Clean up the data
             df.dropna(subset=['course_title', 'course_description'], inplace=True)
             df['course_level'] = df['course_code'].apply(self.extract_course_level)
+            
+            st.info(f"Loaded {len(df)} courses from the catalog")
             return df
+            
         except Exception as e:
-            st.error(f"Error loading CSV: {str(e)}")
+            st.error(f"Error loading course catalog: {str(e)}")
             return None
 
     def generate_embeddings(self, df, model):
+        """Create numerical representations of courses for comparison"""
         try:
-            texts = [f"{row['course_code']} {row['course_title']} {row['course_description']}" for _, row in df.iterrows()]
-            path = Path("wm_embeddings_cached.pkl")
-            if path.exists():
-                with open(path, 'rb') as f:
-                    embs = pickle.load(f)
-                if len(embs) == len(texts):
-                    return embs
-            embs = model.encode(texts, batch_size=32, show_progress_bar=False)
-            with open(path, 'wb') as f:
-                pickle.dump(embs, f)
-            return embs
+            texts = [f"{row['course_code']} {row['course_title']} {row['course_description']}" 
+                    for _, row in df.iterrows()]
+            
+            # Try to use cached version first
+            cache_path = Path("wm_embeddings_cached.pkl")
+            if cache_path.exists():
+                try:
+                    with open(cache_path, 'rb') as f:
+                        cached_embeddings = pickle.load(f)
+                    if len(cached_embeddings) == len(texts):
+                        st.info("Using previously processed course data (this makes things faster!)")
+                        return cached_embeddings
+                except:
+                    pass  # If cache fails, just generate new ones
+            
+            # Generate new embeddings
+            st.info("Processing course descriptions for comparison... This may take a moment.")
+            embeddings = model.encode(texts, batch_size=32, show_progress_bar=False)
+            
+            # Save to cache
+            try:
+                with open(cache_path, 'wb') as f:
+                    pickle.dump(embeddings, f)
+            except:
+                pass  # If caching fails, that's okay
+                
+            return embeddings
+            
         except Exception as e:
-            st.error(f"Error generating embeddings: {str(e)}")
+            st.error(f"Error processing course descriptions: {str(e)}")
             return None
 
     def find_matches(self, external_courses, model, df, embeddings):
+        """Find the best matching courses from the university catalog"""
         matches = {}
+        
         for i, course in enumerate(external_courses):
-            title, desc, keywords, target = course['title'], course['description'], course['keywords'], course['target_level']
-            if not title or not desc:
+            title = course['title']
+            description = course['description']
+            keywords = course['keywords']
+            target_level = course['target_level']
+            
+            if not title or not description:
                 continue
-            # keyword filter
+            
+            # Filter by keywords if provided
+            filtered_df = df.copy()
             if keywords.strip():
-                kws = [k.strip().lower() for k in keywords.split(',')]
-                df = df[df.apply(lambda r: any(k in f"{r['course_code']} {r['course_title']} {r['course_description']}`".lower() for k in kws), axis=1)]
-            if len(df) == 0:
-                continue
-            texts = [f"{r['course_code']} {r['course_title']} {r['course_description']}" for _, r in df.iterrows()]
-            embs = model.encode(texts) if len(df) < len(st.session_state.university_courses_df) else embeddings
-            ext_emb = model.encode([f"{title} {desc}"])
-            sims = cosine_similarity(ext_emb, embs)[0]
-            if target:
-                for idx in range(len(sims)):
-                    sims[idx] += self.calculate_level_bonus(df.iloc[idx]['course_level'], target)
-            top_idx = np.argsort(sims)[-5:][::-1]
+                keyword_list = [k.strip().lower() for k in keywords.split(',')]
+                filtered_df = df[df.apply(
+                    lambda row: any(
+                        keyword in f"{row['course_code']} {row['course_title']} {row['course_description']}".lower() 
+                        for keyword in keyword_list
+                    ), axis=1
+                )]
+                
+                if len(filtered_df) == 0:
+                    st.warning(f"No courses found matching keywords: {keywords}")
+                    continue
+            
+            # Generate embeddings for comparison
+            if len(filtered_df) == len(df):
+                # Use pre-computed embeddings
+                comparison_embeddings = embeddings
+            else:
+                # Generate embeddings for filtered set
+                texts = [f"{row['course_code']} {row['course_title']} {row['course_description']}" 
+                        for _, row in filtered_df.iterrows()]
+                comparison_embeddings = model.encode(texts)
+            
+            # Create embedding for external course
+            external_text = f"{title} {description}"
+            external_embedding = model.encode([external_text])
+            
+            # Calculate similarities
+            similarities = cosine_similarity(external_embedding, comparison_embeddings)[0]
+            
+            # Add level bonus
+            if target_level:
+                for idx in range(len(similarities)):
+                    course_level = filtered_df.iloc[idx]['course_level']
+                    level_bonus = self.calculate_level_bonus(course_level, target_level)
+                    similarities[idx] += level_bonus
+            
+            # Get top 5 matches
+            top_indices = np.argsort(similarities)[-5:][::-1]
+            
             course_matches = []
-            for idx in top_idx:
-                row = df.iloc[idx]
-                orig = cosine_similarity(ext_emb, [embs[idx]])[0][0]
-                adj = sims[idx]
-                bonus = adj - orig
+            for idx in top_indices:
+                row = filtered_df.iloc[idx]
+                original_similarity = cosine_similarity(external_embedding, [comparison_embeddings[idx]])[0][0]
+                adjusted_similarity = similarities[idx]
+                level_bonus = adjusted_similarity - original_similarity
+                
                 course_matches.append({
                     'course_code': row['course_code'],
                     'title': row['course_title'],
                     'description': row['course_description'],
                     'course_level': row['course_level'],
-                    'similarity': orig,
-                    'adjusted_similarity': adj,
-                    'level_bonus': bonus
+                    'similarity': original_similarity,
+                    'adjusted_similarity': adjusted_similarity,
+                    'level_bonus': level_bonus
                 })
+            
             matches[i] = course_matches
+        
         return matches
 
     def calculate_transferability(self, title1, desc1, title2, desc2, model):
+        """Calculate how likely a course is to transfer"""
         try:
-            e_desc = model.encode([desc1, desc2])
-            sim_desc = cosine_similarity([e_desc[0]], [e_desc[1]])[0][0]
-            e_title = model.encode([title1, title2])
-            sim_title = cosine_similarity([e_title[0]], [e_title[1]])[0][0]
-            score = 1 / (1 + math.exp(-(-7.144 + 9.219 * sim_desc + 5.141 * sim_title)))
-            return sim_desc, sim_title, score
-        except:
+            # Compare course descriptions
+            desc_embeddings = model.encode([desc1, desc2])
+            desc_similarity = cosine_similarity([desc_embeddings[0]], [desc_embeddings[1]])[0][0]
+            
+            # Compare course titles
+            title_embeddings = model.encode([title1, title2])
+            title_similarity = cosine_similarity([title_embeddings[0]], [title_embeddings[1]])[0][0]
+            
+            # Calculate final transferability score using a trained formula
+            score = 1 / (1 + math.exp(-(-7.144 + 9.219 * desc_similarity + 5.141 * title_similarity)))
+            
+            return desc_similarity, title_similarity, score
+            
+        except Exception as e:
+            st.error(f"Error calculating transferability: {str(e)}")
             return None, None, None
 
     def get_transferability_category(self, score):
-        if score >= 0.85: return "Very High Transferability", "🟢"
-        elif score >= 0.7279793: return "Likely Transferable", "🔵"
-        elif score >= 0.6: return "Possibly Transferable", "🟡"
-        elif score >= 0.4: return "Unlikely Transferable", "🟠"
-        return "Very Low Transferability", "🔴"
+        """Convert score to easy-to-understand category"""
+        if score >= 0.85:
+            return "Very Likely to Transfer", "🟢"
+        elif score >= 0.73:
+            return "Likely to Transfer", "🔵"
+        elif score >= 0.6:
+            return "Might Transfer", "🟡"
+        elif score >= 0.4:
+            return "Probably Won't Transfer", "🟠"
+        else:
+            return "Very Unlikely to Transfer", "🔴"
 
 def main():
-    st.markdown('<h1 class="main-header">🎓 Course Transferability Analyzer</h1>', unsafe_allow_html=True)
-    analyzer = CourseTransferabilityAnalyzer()
-
+    st.markdown('<h1 class="main-header">🎓 Will My Courses Transfer?</h1>', unsafe_allow_html=True)
+    
+    # Sidebar
     with st.sidebar:
-        st.title("📋 Controls")
-        if st.button("Toggle Instructions"):
-            st.session_state.instructions_visible = not st.session_state.instructions_visible
+        st.title("📋 Menu")
+        
+        if st.button("ℹ️ Show/Hide Help"):
+            st.session_state.show_help = not st.session_state.show_help
+        
+        st.markdown("---")
+        
+        # Model loading
         if st.session_state.model is None:
-            if st.button("🔄 Load AI Model"):
-                with st.spinner("Loading model..."):
+            if st.button("🚀 Start the App"):
+                with st.spinner("Loading the course comparison tool..."):
+                    analyzer = CourseTransferChecker()
                     st.session_state.model = analyzer.load_model()
-                if st.session_state.model: st.success("✅ Model loaded!")
-        st.subheader("📁 Data Source")
-        csv_source = st.radio("Choose CSV source:", ["Upload File", "Use App's CSV File"], key="csv_source")
-        if st.button("🔄 Clear Session"):
-            for k in list(st.session_state.keys()):
-                if k != 'instructions_visible': del st.session_state[k]
-            st.experimental_rerun()
+                if st.session_state.model:
+                    st.success("✅ Ready to go!")
+                else:
+                    st.error("❌ Something went wrong")
+        else:
+            st.success("✅ App is ready!")
+        
+        st.markdown("---")
+        
+        # Data source selection
+        st.subheader("📁 Course Catalog")
+        csv_source = st.radio(
+            "Where are your university courses?",
+            ["Upload a file", "Use built-in catalog"],
+            key="csv_source"
+        )
+        
+        st.markdown("---")
+        
+        if st.button("🔄 Start Over"):
+            for key in list(st.session_state.keys()):
+                if key != 'show_help':
+                    del st.session_state[key]
+            st.rerun()
 
-    if st.session_state.instructions_visible:
-        st.info("1. Load AI model → 2. Load courses → 3. Add external courses → 4. Find & analyze matches")
+    # Help section
+    if st.session_state.show_help:
+        st.markdown("""
+        <div class="help-text">
+        <h3>How to Use This App:</h3>
+        <ol>
+        <li><strong>Start the App:</strong> Click "Start the App" in the sidebar</li>
+        <li><strong>Load Courses:</strong> Upload your university's course catalog or use the built-in one</li>
+        <li><strong>Add Your Courses:</strong> Enter the courses you want to transfer</li>
+        <li><strong>Find Matches:</strong> The app will find similar courses at the new university</li>
+        <li><strong>Check Transferability:</strong> See how likely each course is to transfer</li>
+        </ol>
+        </div>
+        """, unsafe_allow_html=True)
 
+    # Check if model is loaded
     if st.session_state.model is None:
-        st.warning("⚠️ Load the AI model first!")
+        st.warning("⚠️ Please click 'Start the App' in the sidebar to begin!")
         return
 
-    st.subheader("📁 Step 1: Load Course Catalog")
-    csv_file = st.file_uploader("Upload CSV", type=['csv']) if csv_source == "Upload File" else "url"
-    if csv_file and st.button("Load Course Data"):
-        with st.spinner("Loading courses..."):
+    analyzer = CourseTransferChecker()
+
+    # Step 1: Load Course Catalog
+    st.markdown('<div class="step-header">📁 Step 1: Load University Course Catalog</div>', unsafe_allow_html=True)
+    
+    if csv_source == "Upload a file":
+        st.info("Upload a CSV file with columns: course_code, course_title, course_description")
+        csv_file = st.file_uploader("Choose your CSV file", type=['csv'])
+    else:
+        csv_file = "url"
+        st.info("Using the built-in William & Mary course catalog")
+
+    if csv_file and st.button("📂 Load Courses"):
+        with st.spinner("Loading course catalog..."):
             df = analyzer.load_csv_data(csv_file)
+            
         if df is not None:
             st.session_state.university_courses_df = df
-            with st.spinner("Generating embeddings..."):
-                embs = analyzer.generate_embeddings(df, st.session_state.model)
-            if embs is not None: st.session_state.university_embeddings = embs
-            st.success("✅ Data ready!")
-            st.dataframe(df[['course_code','course_title','course_level']].head(5))
+            
+            with st.spinner("Preparing courses for comparison..."):
+                embeddings = analyzer.generate_embeddings(df, st.session_state.model)
+                
+            if embeddings is not None:
+                st.session_state.university_embeddings = embeddings
+                st.success("✅ Course catalog ready!")
+                
+                # Show preview
+                with st.expander("📋 Preview of loaded courses"):
+                    preview_df = df[['course_code', 'course_title', 'course_level']].head(10)
+                    st.dataframe(preview_df, use_container_width=True)
 
+    # Step 2: Add External Courses
     if st.session_state.university_courses_df is not None:
-        st.subheader("📚 Step 2: Add External Courses")
-        n = st.slider("Number of external courses",1,10,3)
+        st.markdown('<div class="step-header">📚 Step 2: Enter Your Courses</div>', unsafe_allow_html=True)
+        
+        st.info("Add the courses you took at your previous school that you want to transfer")
+        
+        num_courses = st.slider("How many courses do you want to check?", 1, 10, 3)
+        
         external_courses = []
-        for i in range(n):
-            with st.expander(f"External Course {i+1}"):
-                title = st.text_input(f"Title {i+1}")
-                desc = st.text_area(f"Description {i+1}")
-                kw = st.text_input(f"Keywords {i+1} (optional)")
-                lvl = st.selectbox(f"Target Level {i+1}",[None,100,200,300,400],format_func=lambda x:"Any" if x is None else f"{x} Level")
-                if title and desc:
-                    external_courses.append({'title':title,'description':desc,'keywords':kw,'target_level':lvl})
+        
+        for i in range(num_courses):
+            with st.expander(f"Course #{i+1}", expanded=(i < 2)):
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    title = st.text_input(f"Course Title", key=f"title_{i}", 
+                                        placeholder="e.g., Introduction to Psychology")
+                    description = st.text_area(f"Course Description", key=f"desc_{i}",
+                                             placeholder="Describe what you learned in this course...",
+                                             height=100)
+                
+                with col2:
+                    keywords = st.text_input(f"Keywords (optional)", key=f"keywords_{i}",
+                                           placeholder="psychology, behavior")
+                    target_level = st.selectbox(
+                        f"Course Level",
+                        [None, 100, 200, 300, 400],
+                        format_func=lambda x: "Any Level" if x is None else f"{x} Level",
+                        key=f"level_{i}"
+                    )
+                
+                if title and description:
+                    external_courses.append({
+                        'title': title,
+                        'description': description,
+                        'keywords': keywords,
+                        'target_level': target_level
+                    })
 
-        if external_courses and st.button("Find Top 5 Matches"):
-            with st.spinner("Finding matches..."):
-                st.session_state.course_matches = analyzer.find_matches(external_courses,st.session_state.model,st.session_state.university_courses_df,st.session_state.university_embeddings)
+        # Step 3: Find Matches
+        if external_courses:
+            st.markdown('<div class="step-header">🔍 Step 3: Find Similar Courses</div>', unsafe_allow_html=True)
+            
+            if st.button("🔍 Find Matching Courses", type="primary"):
+                with st.spinner("Searching for similar courses..."):
+                    matches = analyzer.find_matches(
+                        external_courses, 
+                        st.session_state.model,
+                        st.session_state.university_courses_df, 
+                        st.session_state.university_embeddings
+                    )
+                    st.session_state.course_matches = matches
+                
+                if matches:
+                    st.success(f"✅ Found matches for {len(matches)} courses!")
 
+    # Step 4: Select and Analyze
     if st.session_state.course_matches:
-        st.subheader("🎯 Step 4: Analyze Transferability")
-        sel = {}
-        for i, matches in st.session_state.course_matches.items():
-            st.write(f"Select matches for External Course {i+1}")
-            opts = [f"{m['course_code']} - {m['title']}" for m in matches]
-            chosen = st.multiselect(f"Choose for analysis {i+1}", opts)
-            if chosen: sel[i] = [opts.index(c) for c in chosen]
+        st.markdown('<div class="step-header">✅ Step 4: Select Courses to Analyze</div>', unsafe_allow_html=True)
+        
+        selected_matches = {}
+        
+        for course_idx, matches in st.session_state.course_matches.items():
+            if course_idx < len(external_courses):
+                ext_course = external_courses[course_idx]
+                st.write(f"**Your Course:** {ext_course['title']}")
+                
+                # Create options for selection
+                match_options = []
+                for i, match in enumerate(matches):
+                    similarity_pct = int(match['adjusted_similarity'] * 100)
+                    option = f"{match['course_code']} - {match['title']} ({similarity_pct}% match)"
+                    match_options.append(option)
+                
+                selected = st.multiselect(
+                    "Select which courses you want to check for transfer:",
+                    match_options,
+                    key=f"select_{course_idx}"
+                )
+                
+                if selected:
+                    selected_indices = [match_options.index(sel) for sel in selected]
+                    selected_matches[course_idx] = selected_indices
+                
+                st.markdown("---")
 
-        if sel and st.button("Analyze Selected Matches"):
-            results = []
-            for ci, mis in sel.items():
-                ext = external_courses[ci]
-                for mi in mis:
-                    m = st.session_state.course_matches[ci][mi]
-                    ds,ts,score = analyzer.calculate_transferability(ext['title'],ext['description'],m['title'],m['description'],st.session_state.model)
-                    if score is not None:
-                        cat,emoji = analyzer.get_transferability_category(score)
-                        results.append({
-                            'External': ext['title'],
-                            'WM Code': m['course_code'],
-                            'WM Title': m['title'],
-                            'Score': score,
-                            'Category': cat,
-                            'Emoji': emoji
-                        })
-            if results:
-                st.success("✅ Analysis complete!")
-                # Show big cards
-                color_map = {
-                    "Very High Transferability":"#d4edda",
-                    "Likely Transferable":"#cce5ff",
-                    "Possibly Transferable":"#fff3cd",
-                    "Unlikely Transferable":"#ffe5b4",
-                    "Very Low Transferability":"#f8d7da"
-                }
-                for r in results:
-                    bg=color_map[r['Category']]
-                    bar_color='#28a745' if r['Score']>0.7 else ('#ffc107' if r['Score']>0.4 else '#dc3545')
-                    st.markdown(f"""
-                    <div class='result-card' style='background:{bg};'>
-                        <h2 style='text-align:center;'>{r['Emoji']} {r['Category']}</h2>
-                        <p style='text-align:center;'><b>{r['External']}</b> → <b>{r['WM Code']} {r['WM Title']}</b></p>
-                        <div class='result-bar'><div class='result-bar-fill' style='width:{r['Score']*100}%;background:{bar_color};'></div></div>
-                        <p style='text-align:center;'>Transferability Score: <b>{round(r['Score']*100,1)}%</b></p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                # Collapsible table
-                with st.expander("📊 View Full Table"):
-                    st.dataframe(pd.DataFrame(results))
+        # Step 5: Final Analysis
+        if selected_matches:
+            st.markdown('<div class="step-header">🎯 Step 5: Transfer Analysis</div>', unsafe_allow_html=True)
+            
+            if st.button("📊 Check Transfer Likelihood", type="primary"):
+                results = []
+                
+                progress_bar = st.progress(0)
+                total_analyses = sum(len(indices) for indices in selected_matches.values())
+                current_analysis = 0
+                
+                for course_idx, match_indices in selected_matches.items():
+                    external_course = external_courses[course_idx]
+                    
+                    for match_idx in match_indices:
+                        match = st.session_state.course_matches[course_idx][match_idx]
+                        
+                        # Calculate transferability
+                        desc_sim, title_sim, score = analyzer.calculate_transferability(
+                            external_course['title'],
+                            external_course['description'],
+                            match['title'],
+                            match['description'],
+                            st.session_state.model
+                        )
+                        
+                        if score is not None:
+                            category, emoji = analyzer.get_transferability_category(score)
+                            results.append({
+                                'Your Course': external_course['title'],
+                                'University Code': match['course_code'],
+                                'University Course': match['title'],
+                                'Transfer Score': score,
+                                'Category': category,
+                                'Emoji': emoji
+                            })
+                        
+                        current_analysis += 1
+                        progress_bar.progress(current_analysis / total_analyses)
+                
+                progress_bar.empty()
+                
+                if results:
+                    st.success("✅ Analysis complete!")
+                    
+                    # Display results as cards
+                    color_mapping = {
+                        "Very Likely to Transfer": "#d4edda",
+                        "Likely to Transfer": "#cce5ff", 
+                        "Might Transfer": "#fff3cd",
+                        "Probably Won't Transfer": "#ffe5b4",
+                        "Very Unlikely to Transfer": "#f8d7da"
+                    }
+                    
+                    for result in results:
+                        bg_color = color_mapping[result['Category']]
+                        score = result['Transfer Score']
+                        
+                        if score > 0.7:
+                            bar_color = '#28a745'  # Green
+                        elif score > 0.4:
+                            bar_color = '#ffc107'  # Yellow
+                        else:
+                            bar_color = '#dc3545'  # Red
+                        
+                        st.markdown(f"""
+                        <div class='result-card' style='background-color: {bg_color}; border: 1px solid #ddd;'>
+                            <h2 style='text-align: center; margin-bottom: 15px;'>
+                                {result['Emoji']} {result['Category']}
+                            </h2>
+                            <p style='text-align: center; font-size: 1.1em; margin-bottom: 15px;'>
+                                <strong>{result['Your Course']}</strong><br>
+                                ↓<br>
+                                <strong>{result['University Code']}: {result['University Course']}</strong>
+                            </p>
+                            <div class='result-bar'>
+                                <div class='result-bar-fill' style='width: {score*100}%; background-color: {bar_color};'></div>
+                            </div>
+                            <p style='text-align: center; font-size: 1.2em; font-weight: bold; margin-top: 10px;'>
+                                Transfer Likelihood: {round(score*100, 1)}%
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # Summary table
+                    with st.expander("📊 Summary Table"):
+                        summary_df = pd.DataFrame(results)
+                        summary_df['Transfer Score'] = summary_df['Transfer Score'].round(3)
+                        st.dataframe(summary_df.drop(['Emoji'], axis=1), use_container_width=True)
 
 if __name__ == "__main__":
     main()
