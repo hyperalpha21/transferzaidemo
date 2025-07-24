@@ -8,11 +8,11 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Similarity threshold for auto-classification
-TRANSFER_THRESHOLD = 0.6 
+TRANSFER_THRESHOLD = 0.6  # based on expert calibration
 
 # Page config
 st.set_page_config(
-    page_title='Welcome to TransferzAI',
+    page_title='TransferzAI',
     page_icon='🎓',
     layout='wide'
 )
@@ -178,10 +178,10 @@ def main():
             '<div class="help-text">'
             '<h3>How to Use</h3>'
             '<ol>'
-            '<li><strong>Start the Model:</strong> Click **Start Model** in the sidebar.</li>'
-            '<li><strong>Load the Course Catalog:</strong> Select **W&M Catalog** or upload your CSV.</li>'
+            '<li><strong>Start the Model:</strong> Click "Start Model" in the sidebar.</li>'
+            '<li><strong>Load the Course Catalog:</strong> Select "W&M Catalog" or upload your CSV.</li>'
             '<li><strong>Add Your Courses:</strong> Enter the title, description, optional keywords, and level.</li>'
-            '<li><strong>Analyze Transfer:</strong> Click **Analyze Courses** to view transfer results.</li>'
+            '<li><strong>Analyze Transfer:</strong> Click "Analyze Courses" to view transfer results.</li>'
             '</ol>'
             '</div>',
             unsafe_allow_html=True
