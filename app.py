@@ -44,19 +44,16 @@ st.markdown('''<style>
     margin: 10px 0;
     color: #333333;
 }
-.help-text h3 { color: #2c3e50; margin-bottom: 10px; }
-.help-text ol, .help-text li { color: #333333; }
-.help-text strong { color: #2c3e50; }
 </style>''', unsafe_allow_html=True)
 
-# Session state initialization
+# Initialize session state
 for key in ('model','university_courses_df','university_embeddings','course_matches','show_help'):
     if key not in st.session_state:
-        st.session_state[key] = {} if key == 'course_matches' else (True if key=='show_help' else None)
+        st.session_state[key] = {} if key=='course_matches' else (True if key=='show_help' else None)
 
 class CourseTransferChecker:
     @st.cache_resource
-    def load_model(self):
+    def load_model(_self):
         try:
             return SentenceTransformer('paraphrase-MiniLM-L6-v2')
         except Exception as e:
@@ -66,9 +63,17 @@ class CourseTransferChecker:
     def extract_course_level(self, code):
         try:
             num = re.search(r'(\d{3,4})', code)
-            if not num: return None
+            if not num:
+                return None
             level = int(num.group(1))
-            return (100 if level<200 else 200 if level<300 else 300 if level<400 else 400)
+            if level < 200:
+                return 100
+            elif level < 300:
+                return 200
+            elif level < 400:
+                return 300
+            else:
+                return 400
         except:
             return None
 
@@ -76,10 +81,16 @@ class CourseTransferChecker:
         if course_level is None or target_level is None:
             return 0.0
         diff = abs(course_level - target_level)
-        return 0.15 if diff==0 else 0.12 if diff==100 else 0.02 if diff==200 else 0.0
+        if diff == 0:
+            return 0.15
+        elif diff == 100:
+            return 0.12
+        elif diff == 200:
+            return 0.02
+        return 0.0
 
     @st.cache_data
-    def load_csv_data(self, source):
+    def load_csv_data(_self, source):
         try:
             encodings = ['utf-8','latin-1','cp1252','iso-8859-1']
             df = None
@@ -91,20 +102,22 @@ class CourseTransferChecker:
                 except UnicodeDecodeError:
                     continue
             if df is None:
-                st.error('Could not load CSV.'); return None
+                st.error('Could not load CSV; unsupported format.')
+                return None
             required = ['course_code','course_title','course_description']
             missing = [c for c in required if c not in df.columns]
             if missing:
-                st.error(f'Missing columns: {missing}'); return None
+                st.error(f'Missing required columns: {missing}')
+                return None
             df.dropna(subset=['course_title','course_description'], inplace=True)
-            df['course_level'] = df['course_code'].apply(self.extract_course_level)
+            df['course_level'] = df['course_code'].apply(_self.extract_course_level)
             return df
         except Exception as e:
             st.error(f'Error loading catalog: {e}')
             return None
 
     @st.cache_data
-    def generate_embeddings(self, df):
+    def generate_embeddings(_self, df):
         texts = df['course_code'] + ' ' + df['course_title'] + ' ' + df['course_description']
         import hashlib
         key = hashlib.md5('||'.join(texts).encode()).hexdigest()
@@ -120,38 +133,54 @@ class CourseTransferChecker:
             return None
         st.info('Encoding courses...')
         prog = st.progress(0)
-        batch = 16
         all_emb = []
-        for i in range(0,len(texts),batch):
+        batch = 16
+        for i in range(0, len(texts), batch):
             chunk = texts[i:i+batch].tolist()
             emb = model.encode(chunk, show_progress_bar=False)
             all_emb.extend(emb)
-            prog.progress(min((i+batch)/len(texts),1.0))
-        emb_array = np.array(all_emb)
-        try: pickle.dump(emb_array, open(cache_file,'wb'))
-        except: pass
+            prog.progress(min((i+batch)/len(texts), 1.0))
         prog.empty()
+        emb_array = np.array(all_emb)
+        try:
+            pickle.dump(emb_array, open(cache_file,'wb'))
+        except:
+            pass
         return emb_array
 
     def find_matches(self, external_courses, df, embeddings):
         results = {}
         st.info('Searching for similar courses...')
         for idx, course in enumerate(external_courses):
-            title, desc, kw, lvl = course.values()
+            title = course['title']
+            desc = course['description']
+            kw = course['keywords']
+            lvl = course['target_level']
             df_f, emb_f = df, embeddings
             if kw:
-                mask = df.apply(lambda r: any(k.lower() in (r['course_code']+r['course_title']+r['course_description']).lower() for k in kw.split(',')), axis=1)
-                df_f, emb_f = df[mask], embeddings[mask.values]
+                mask = df.apply(lambda r: any(k.strip().lower() in f"{r['course_code']} {r['course_title']} {r['course_description']}".lower() for k in kw.split(',')), axis=1)
+                df_f = df[mask]
+                emb_f = embeddings[mask.values]
                 if df_f.empty:
-                    st.warning(f'No keyword matches for {kw}'); continue
-            emb_ext = st.session_state.model.encode([f"{title} {desc}"])
-            sims = cosine_similarity(emb_ext, emb_f)[0]
+                    st.warning(f'No matches for keywords: {kw}')
+                    continue
+            ext_emb = st.session_state.model.encode([f"{title} {desc}"])
+            sims = cosine_similarity(ext_emb, emb_f)[0]
             if lvl:
-                sims += df_f['course_level'].apply(lambda x: self.calculate_level_bonus(x,lvl)).values
-            idxs = np.argpartition(sims,-5)[-5:]
+                sims += df_f['course_level'].apply(lambda x: self.calculate_level_bonus(x, lvl)).values
+            # take top 5
+            idxs = np.argpartition(sims, -5)[-5:]
             top = idxs[np.argsort(sims[idxs])[::-1]]
-            matches = [{'course_code': df_f.iloc[i]['course_code'], 'title':df_f.iloc[i]['course_title'], 'adjusted_similarity':sims[i]} for i in top]
-            results[idx] = matches
+            matches = []
+            for i in top:
+                row = df_f.iloc[i]
+                matches.append({
+                    'course_code': row['course_code'],
+                    'title': row['course_title'],
+                    'adjusted_similarity': sims[i]
+                })
+            if matches:
+                results[idx] = matches
         return results
 
 # Main app
@@ -170,76 +199,3 @@ def main():
             st.success('Model loaded')
         st.markdown('---')
         st.subheader('📁 Course Catalog')
-        source = st.radio('Catalog source',['Upload file','W&M catalog'], key='csv_source')
-        if st.button('🔄 Reset'):
-            for k in list(st.session_state.keys()):
-                if k not in ['show_help']:
-                    del st.session_state[k]
-            st.experimental_rerun()
-
-    if st.session_state.show_help:
-        st.markdown('<div class="help-text"><h3>How to use:</h3><ol><li>Start App</li><li>Load catalog</li><li>Enter courses</li><li>Analyze</li></ol></div>', unsafe_allow_html=True)
-    if st.session_state.model is None:
-        st.warning('Start the app first'); return
-    checker = CourseTransferChecker()
-
-    # Step 1: Load catalog
-    st.markdown('<div class="step-header">📁 Step 1: Load Catalog</div>', unsafe_allow_html=True)
-    if source=='Upload file':
-        file = st.file_uploader('CSV file', type='csv')
-    else:
-        file = 'url'; st.info('Using built-in catalog')
-    if file and st.button('📂 Load'):
-        df = checker.load_csv_data('url' if source!=' ' else file)
-        if df is not None:
-            st.session_state.university_courses_df = df
-            with st.spinner('Embedding...'):
-                emb = checker.generate_embeddings(df)
-            st.session_state.university_embeddings = emb
-            st.success('Catalog ready')
-            with st.expander('Preview'):
-                st.dataframe(df[['course_code','course_title']].head(5))
-
-    # Step 2: Enter courses
-    if st.session_state.university_courses_df is not None:
-        st.markdown('<div class="step-header">📚 Step 2: Enter Your Courses</div>', unsafe_allow_html=True)
-        n = st.slider('Number of courses',1,10,3)
-        external = []
-        for i in range(n):
-            with st.expander(f'Course {i+1}', expanded=i<2):
-                t = st.text_input('Title', key=f't{i}')
-                d = st.text_area('Description', key=f'd{i}')
-                k = st.text_input('Keywords', key=f'k{i}')
-                l = st.selectbox('Level',[None,100,200,300,400], key=f'l{i}')
-            if t and d:
-                external.append({'title':t,'description':d,'keywords':k,'target_level':l})
-
-        # Step 3: Analyze
-        if external:
-            st.markdown('<div class="step-header">🔍 Step 3: Analyze</div>', unsafe_allow_html=True)
-            if st.button('🔍 Analyze Courses'):
-                res = checker.find_matches(external, st.session_state.university_courses_df, st.session_state.university_embeddings)
-                st.session_state.course_matches = res
-                st.success('Done')
-
-    # Step 4: Display results
-    if st.session_state.course_matches:
-        st.markdown('<div class="step-header">✅ Results</div>', unsafe_allow_html=True)
-        for idx, matches in st.session_state.course_matches.items():
-            course = external[idx]['title']
-            st.write(f"**{course}**")
-            top = matches[0]
-            score = top['adjusted_similarity']
-            pct = round(score*100,1)
-            if score>=TRANSFER_THRESHOLD:
-                st.success(f"✅ Likely ({pct}%) – {top['course_code']}: {top['title']}")
-            else:
-                st.warning(f"⚠️ Review ({pct}%)")
-                st.markdown('Top 3 alternatives:')
-                for alt in matches[:3]:
-                    ap = round(alt['adjusted_similarity']*100,1)
-                    st.markdown(f"- {alt['course_code']}: {alt['title']} ({ap}%)")
-            st.markdown('---')
-
-if __name__=='__main__':
-    main()
