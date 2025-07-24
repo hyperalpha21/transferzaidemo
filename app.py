@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Similarity threshold for auto-classification
-TRANSFER_THRESHOLD = 0.6  # based on expert calibration
+TRANSFER_THRESHOLD = 0.6 
 
 # Page config
 st.set_page_config(
@@ -151,7 +151,8 @@ class CourseTransferChecker:
 # Build UI
 
 def main():
-    st.markdown('<h1 class="main-header">🎓 Will My Courses Transfer?</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🎓 TransferzAI</h1>', unsafe_allow_html=True)
+    # Page header updated to reflect app name🎓 TransferzAI</h1>', unsafe_allow_html=True)
     checker = CourseTransferChecker()
 
     with st.sidebar:
