@@ -12,7 +12,7 @@ TRANSFER_THRESHOLD = 0.6
 
 # Page config
 st.set_page_config(
-    page_title='TransferzAI',
+    page_title='Welcome to TransferzAI',
     page_icon='🎓',
     layout='wide'
 )
