@@ -12,7 +12,7 @@ TRANSFER_THRESHOLD = 0.6
 
 # Page config
 st.set_page_config(
-    page_title='Welcome to TransferzAI',
+    page_title='TransferzAI',
     page_icon='🎓',
     layout='wide'
 )
@@ -151,7 +151,7 @@ class CourseTransferChecker:
 # Build UI
 
 def main():
-    st.markdown('<h1 class="main-header">🎓 TransferzAI</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🎓 Welcome to TransferzAI</h1>', unsafe_allow_html=True)
     # Page header updated to reflect app name🎓 TransferzAI</h1>', unsafe_allow_html=True)
     checker = CourseTransferChecker()
 
