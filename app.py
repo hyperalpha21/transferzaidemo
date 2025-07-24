@@ -7,7 +7,6 @@ from pathlib import Path
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# Similarity threshold for auto-classification
 TRANSFER_THRESHOLD = 0.6
 
 # Page config
@@ -76,7 +75,6 @@ class CourseTransferChecker:
     @st.cache_data
     def generate_embeddings(_self, df:pd.DataFrame):
         texts=(df['course_code']+' '+df['course_title']+' '+df['course_description']).tolist()
-        # simple cache key
         import hashlib
         key=hashlib.md5('|'.join(texts).encode()).hexdigest()
         cache_file=Path(f'emb_{key}.pkl')
@@ -117,7 +115,6 @@ class CourseTransferChecker:
             sims=cosine_similarity(ext_emb,sub_emb)[0]
             if lvl:
                 sims+=sub_df['level'].apply(lambda x:self.level_bonus(x,lvl)).values
-            # top 5
             top_idx=np.argpartition(sims,-5)[-5:]
             top=top_idx[np.argsort(sims[top_idx])[::-1]]
             hits=[{'code':sub_df.iloc[i]['course_code'],'title':sub_df.iloc[i]['course_title'],'sim':sims[i]} for i in top]
@@ -166,10 +163,10 @@ def main():
             st.success('Catalog ready')
 
     # Enter courses
+    external=[]
     if st.session_state.courses_df is not None:
         st.markdown('<div class="step-header">📚 Step 2: Add Your Courses</div>',unsafe_allow_html=True)
         n=st.slider('How many?',1,10,3)
-        external=[]
         for i in range(n):
             with st.expander(f'Course {i+1}',expanded=i<2):
                 t=st.text_input('Title',key=f't{i}')
@@ -185,6 +182,14 @@ def main():
     # Display results
     if st.session_state.matches:
         st.markdown('<div class="step-header">✅ Results</div>',unsafe_allow_html=True)
+        # Summary metrics
+        total=len(external)
+        likely=sum(1 for idx,hits in st.session_state.matches.items() if hits and hits[0]['sim']>=TRANSFER_THRESHOLD)
+        needs=total-likely
+        col1,col2=st.columns(2)
+        col1.metric('Likely to Transfer', f'{likely}/{total}')
+        col2.metric('Needs Review', f'{needs}/{total}')
+        # Detailed per-course feedback
         for idx,hits in st.session_state.matches.items():
             course=external[idx]['title']
             st.write(f"**{course}**")
@@ -192,7 +197,7 @@ def main():
             score=best['sim']
             pct=round(score*100,1)
             if score>=TRANSFER_THRESHOLD:
-                st.success(f"✅ Likely to Transfer ({pct}%) — {best['code']}: {best['title']}")
+                st.success(f"✅ Likely ({pct}%) — {best['code']}: {best['title']}")
             else:
                 st.warning(f"⚠️ Needs Review ({pct}%)")
                 st.markdown('Top alternatives:')
