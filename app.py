@@ -59,6 +59,21 @@ st.markdown("""
     border-radius: 8px;
     border-left: 4px solid #17a2b8;
     margin: 10px 0;
+    color: #333333 !important;
+}
+.help-text h3 {
+    color: #2c3e50 !important;
+    margin-bottom: 10px;
+}
+.help-text ol {
+    color: #333333 !important;
+}
+.help-text li {
+    color: #333333 !important;
+    margin-bottom: 5px;
+}
+.help-text strong {
+    color: #2c3e50 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -120,7 +135,8 @@ class CourseTransferChecker:
             return 0.02  # Two levels off = tiny bonus
         return 0.0
 
-    def load_csv_data(self, csv_source):
+    @st.cache_data
+    def load_csv_data(_self, csv_source):
         """Load the university course catalog with better encoding handling"""
         try:
             # Try different encodings to handle various CSV files
@@ -156,44 +172,72 @@ class CourseTransferChecker:
                 return None
 
             # Clean up the data
+            original_count = len(df)
             df.dropna(subset=['course_title', 'course_description'], inplace=True)
-            df['course_level'] = df['course_code'].apply(self.extract_course_level)
             
-            st.info(f"Loaded {len(df)} courses from the catalog")
+            if len(df) < original_count:
+                st.info(f"Removed {original_count - len(df)} courses with missing information")
+            
+            df['course_level'] = df['course_code'].apply(_self.extract_course_level)
+            
+            st.info(f"📚 Loaded {len(df)} courses from the catalog")
             return df
             
         except Exception as e:
             st.error(f"Error loading course catalog: {str(e)}")
             return None
 
-    def generate_embeddings(self, df, model):
+    @st.cache_data
+    def generate_embeddings(_self, df, _model):
         """Create numerical representations of courses for comparison"""
         try:
             texts = [f"{row['course_code']} {row['course_title']} {row['course_description']}" 
                     for _, row in df.iterrows()]
             
+            # Create a hash of the course data to use as cache key
+            import hashlib
+            data_hash = hashlib.md5(str(sorted(texts)).encode()).hexdigest()
+            cache_path = Path(f"embeddings_cache_{data_hash}.pkl")
+            
             # Try to use cached version first
-            cache_path = Path("wm_embeddings_cached.pkl")
             if cache_path.exists():
                 try:
                     with open(cache_path, 'rb') as f:
                         cached_embeddings = pickle.load(f)
                     if len(cached_embeddings) == len(texts):
-                        st.info("Using previously processed course data (this makes things faster!)")
+                        st.info("✅ Using previously processed course data (much faster!)")
                         return cached_embeddings
                 except:
                     pass  # If cache fails, just generate new ones
             
-            # Generate new embeddings
-            st.info("Processing course descriptions for comparison... This may take a moment.")
-            embeddings = model.encode(texts, batch_size=32, show_progress_bar=False)
+            # Generate new embeddings with progress
+            st.info("🔄 Processing course descriptions for comparison...")
+            progress_bar = st.progress(0)
+            
+            # Process in smaller batches for better progress tracking
+            batch_size = 16  # Smaller batches for better progress updates
+            total_batches = (len(texts) + batch_size - 1) // batch_size
+            all_embeddings = []
+            
+            for i in range(0, len(texts), batch_size):
+                batch = texts[i:i + batch_size]
+                batch_embeddings = _model.encode(batch, batch_size=batch_size, show_progress_bar=False)
+                all_embeddings.extend(batch_embeddings)
+                
+                # Update progress
+                current_batch = (i // batch_size) + 1
+                progress_bar.progress(current_batch / total_batches)
+            
+            progress_bar.empty()
+            embeddings = np.array(all_embeddings)
             
             # Save to cache
             try:
                 with open(cache_path, 'wb') as f:
                     pickle.dump(embeddings, f)
+                st.success("✅ Course data processed and saved for future use!")
             except:
-                pass  # If caching fails, that's okay
+                st.warning("Could not save processed data to cache, but continuing...")
                 
             return embeddings
             
@@ -204,6 +248,10 @@ class CourseTransferChecker:
     def find_matches(self, external_courses, model, df, embeddings):
         """Find the best matching courses from the university catalog"""
         matches = {}
+        
+        total_courses = len(external_courses)
+        progress_bar = st.progress(0)
+        st.info("🔍 Searching for similar courses...")
         
         for i, course in enumerate(external_courses):
             title = course['title']
@@ -216,50 +264,45 @@ class CourseTransferChecker:
             
             # Filter by keywords if provided
             filtered_df = df.copy()
+            filtered_embeddings = embeddings
+            
             if keywords.strip():
                 keyword_list = [k.strip().lower() for k in keywords.split(',')]
-                filtered_df = df[df.apply(
+                mask = df.apply(
                     lambda row: any(
                         keyword in f"{row['course_code']} {row['course_title']} {row['course_description']}".lower() 
                         for keyword in keyword_list
                     ), axis=1
-                )]
+                )
+                filtered_df = df[mask]
+                filtered_embeddings = embeddings[mask.values]
                 
                 if len(filtered_df) == 0:
                     st.warning(f"No courses found matching keywords: {keywords}")
                     continue
             
-            # Generate embeddings for comparison
-            if len(filtered_df) == len(df):
-                # Use pre-computed embeddings
-                comparison_embeddings = embeddings
-            else:
-                # Generate embeddings for filtered set
-                texts = [f"{row['course_code']} {row['course_title']} {row['course_description']}" 
-                        for _, row in filtered_df.iterrows()]
-                comparison_embeddings = model.encode(texts)
-            
-            # Create embedding for external course
+            # Create embedding for external course (cached if possible)
             external_text = f"{title} {description}"
             external_embedding = model.encode([external_text])
             
-            # Calculate similarities
-            similarities = cosine_similarity(external_embedding, comparison_embeddings)[0]
+            # Calculate similarities using vectorized operations
+            similarities = cosine_similarity(external_embedding, filtered_embeddings)[0]
             
-            # Add level bonus
+            # Add level bonus efficiently
             if target_level:
-                for idx in range(len(similarities)):
-                    course_level = filtered_df.iloc[idx]['course_level']
-                    level_bonus = self.calculate_level_bonus(course_level, target_level)
-                    similarities[idx] += level_bonus
+                level_bonuses = filtered_df['course_level'].apply(
+                    lambda x: self.calculate_level_bonus(x, target_level)
+                ).values
+                similarities += level_bonuses
             
-            # Get top 5 matches
-            top_indices = np.argsort(similarities)[-5:][::-1]
+            # Get top 5 matches efficiently
+            top_indices = np.argpartition(similarities, -5)[-5:]
+            top_indices = top_indices[np.argsort(similarities[top_indices])[::-1]]
             
             course_matches = []
             for idx in top_indices:
                 row = filtered_df.iloc[idx]
-                original_similarity = cosine_similarity(external_embedding, [comparison_embeddings[idx]])[0][0]
+                original_similarity = cosine_similarity(external_embedding, [filtered_embeddings[idx]])[0][0]
                 adjusted_similarity = similarities[idx]
                 level_bonus = adjusted_similarity - original_similarity
                 
@@ -274,7 +317,11 @@ class CourseTransferChecker:
                 })
             
             matches[i] = course_matches
+            
+            # Update progress
+            progress_bar.progress((i + 1) / total_courses)
         
+        progress_bar.empty()
         return matches
 
     def calculate_transferability(self, title1, desc1, title2, desc2, model):
