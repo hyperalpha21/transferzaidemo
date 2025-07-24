@@ -154,7 +154,6 @@ class CourseTransferChecker:
                         df = pd.read_csv(csv_source, encoding=encoding)
                     
                     # If we get here, the encoding worked
-                    st.success(f"✅ Successfully loaded CSV file (encoding: {encoding})")
                     break
                 except UnicodeDecodeError:
                     continue
@@ -172,15 +171,9 @@ class CourseTransferChecker:
                 return None
 
             # Clean up the data
-            original_count = len(df)
             df.dropna(subset=['course_title', 'course_description'], inplace=True)
-            
-            if len(df) < original_count:
-                st.info(f"Removed {original_count - len(df)} courses with missing information")
-            
             df['course_level'] = df['course_code'].apply(_self.extract_course_level)
             
-            st.info(f"📚 Loaded {len(df)} courses from the catalog")
             return df
             
         except Exception as e:
@@ -205,13 +198,12 @@ class CourseTransferChecker:
                     with open(cache_path, 'rb') as f:
                         cached_embeddings = pickle.load(f)
                     if len(cached_embeddings) == len(texts):
-                        st.info("✅ Using previously processed course data (much faster!)")
                         return cached_embeddings
                 except:
                     pass  # If cache fails, just generate new ones
             
             # Generate new embeddings with progress
-            st.info("🔄 Processing course descriptions for comparison...")
+            st.info("Processing course descriptions...")
             progress_bar = st.progress(0)
             
             # Process in smaller batches for better progress tracking
@@ -235,9 +227,8 @@ class CourseTransferChecker:
             try:
                 with open(cache_path, 'wb') as f:
                     pickle.dump(embeddings, f)
-                st.success("✅ Course data processed and saved for future use!")
             except:
-                st.warning("Could not save processed data to cache, but continuing...")
+                pass  # If caching fails, that's okay
                 
             return embeddings
             
@@ -250,7 +241,6 @@ class CourseTransferChecker:
         matches = {}
         
         total_courses = len(external_courses)
-        progress_bar = st.progress(0)
         st.info("🔍 Searching for similar courses...")
         
         for i, course in enumerate(external_courses):
@@ -317,11 +307,7 @@ class CourseTransferChecker:
                 })
             
             matches[i] = course_matches
-            
-            # Update progress
-            progress_bar.progress((i + 1) / total_courses)
         
-        progress_bar.empty()
         return matches
 
     def calculate_transferability(self, title1, desc1, title2, desc2, model):
@@ -388,7 +374,7 @@ def main():
         st.subheader("📁 Course Catalog")
         csv_source = st.radio(
             "Where are your university courses?",
-            ["Upload a file", "Use built-in catalog"],
+            ["Upload a file", "Use W&M catalog"],
             key="csv_source"
         )
         
@@ -430,7 +416,7 @@ def main():
         csv_file = st.file_uploader("Choose your CSV file", type=['csv'])
     else:
         csv_file = "url"
-        st.info("Using the built-in William & Mary course catalog")
+        st.info("Using the William & Mary course catalog")
 
     if csv_file and st.button("📂 Load Courses"):
         with st.spinner("Loading course catalog..."):
@@ -505,7 +491,7 @@ def main():
                     st.session_state.course_matches = matches
                 
                 if matches:
-                    st.success(f"✅ Found matches for {len(matches)} courses!")
+                    st.success("✅ Found similar courses!")
 
     # Step 4: Select and Analyze
     if st.session_state.course_matches:
