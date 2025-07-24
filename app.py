@@ -11,7 +11,7 @@ from pathlib import Path
 
 # Page configuration
 st.set_page_config(
-    page_title="Will My Courses Transfer?",
+    page_title="Welcome to TransferzAI",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
