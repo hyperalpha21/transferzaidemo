@@ -8,11 +8,11 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Similarity threshold for auto-classification
-TRANSFER_THRESHOLD = 0.6  
+TRANSFER_THRESHOLD = 0.6 
 
 # Page config
 st.set_page_config(
-    page_title='TransferzAI',
+    page_title='Welcome to TransferzAI',
     page_icon='🎓',
     layout='wide'
 )
@@ -31,11 +31,16 @@ st.markdown('''<style>
 </style>''', unsafe_allow_html=True)
 
 # Session state defaults
-if 'model' not in st.session_state: st.session_state.model = None
-if 'courses_df' not in st.session_state: st.session_state.courses_df = None
-if 'courses_emb' not in st.session_state: st.session_state.courses_emb = None
-if 'matches' not in st.session_state: st.session_state.matches = {}
-if 'show_help' not in st.session_state: st.session_state.show_help = True
+if 'model' not in st.session_state:
+    st.session_state.model = None
+if 'courses_df' not in st.session_state:
+    st.session_state.courses_df = None
+if 'courses_emb' not in st.session_state:
+    st.session_state.courses_emb = None
+if 'matches' not in st.session_state:
+    st.session_state.matches = {}
+if 'show_help' not in st.session_state:
+    st.session_state.show_help = True
 
 class CourseTransferChecker:
     @st.cache_resource
@@ -48,12 +53,14 @@ class CourseTransferChecker:
 
     def extract_level(self, code: str):
         m = re.search(r"(\d{3,4})", code or "")
-        if not m: return None
+        if not m:
+            return None
         n = int(m.group(1))
         return 100 if n < 200 else 200 if n < 300 else 300 if n < 400 else 400
 
     def level_bonus(self, orig, target):
-        if orig is None or target is None: return 0.0
+        if orig is None or target is None:
+            return 0.0
         d = abs(orig - target)
         return 0.15 if d == 0 else 0.12 if d == 100 else 0.02 if d == 200 else 0.0
 
@@ -86,8 +93,10 @@ class CourseTransferChecker:
         key = hashlib.md5('|'.join(texts).encode()).hexdigest()
         cache_file = Path(f'emb_{key}.pkl')
         if cache_file.exists():
-            try: return pickle.load(open(cache_file,'rb'))
-            except: pass
+            try:
+                return pickle.load(open(cache_file, 'rb'))
+            except:
+                pass
         model = st.session_state.model
         if not model:
             st.error('Model not loaded.')
@@ -99,11 +108,13 @@ class CourseTransferChecker:
             chunk = texts[i:i+batch]
             emb = model.encode(chunk, show_progress_bar=False)
             embs.extend(emb)
-            prog.progress(min((i+batch)/len(texts), 1.0))
+            prog.progress(min((i + batch)/len(texts), 1.0))
         prog.empty()
         arr = np.array(embs)
-        try: pickle.dump(arr, open(cache_file,'wb'))
-        except: pass
+        try:
+            pickle.dump(arr, open(cache_file, 'wb'))
+        except:
+            pass
         return arr
 
     def find_matches(self, external: list, df: pd.DataFrame, embs: np.ndarray):
@@ -113,7 +124,12 @@ class CourseTransferChecker:
             title, desc, kw, lvl = course.values()
             sub_df, sub_emb = df, embs
             if kw:
-                mask = df.apply(lambda r: any(k.strip().lower() in (r['course_code']+' '+r['course_title']+' '+r['course_description']).lower() for k in kw.split(',')), axis=1)
+                mask = df.apply(
+                    lambda r: any(
+                        k.strip().lower() in (r['course_code'] + ' ' + r['course_title'] + ' ' + r['course_description']).lower()
+                        for k in kw.split(',')
+                    ), axis=1
+                )
                 sub_df, sub_emb = df[mask], embs[mask.values]
                 if sub_df.empty:
                     st.warning(f'No matches for keywords: {kw}')
@@ -124,7 +140,10 @@ class CourseTransferChecker:
                 sims += sub_df['level'].apply(lambda x: self.level_bonus(x, lvl)).values
             top_idx = np.argpartition(sims, -5)[-5:]
             top = top_idx[np.argsort(sims[top_idx])[::-1]]
-            hits = [{'code': sub_df.iloc[i]['course_code'], 'title': sub_df.iloc[i]['course_title'], 'sim': sims[i]} for i in top]
+            hits = [
+                {'code': sub_df.iloc[i]['course_code'], 'title': sub_df.iloc[i]['course_title'], 'sim': sims[i]}
+                for i in top
+            ]
             if hits:
                 results[idx] = hits
         return results
@@ -148,21 +167,32 @@ def main():
             st.success('Model loaded')
         st.markdown('---')
         st.subheader('📁 Course Catalog')
-        src = st.radio('Source', ['Upload CSV', 'Built-in catalog'], key='src')
+        src = st.radio('Source', ['Upload CSV', 'W&M Catalog'], key='src')
         if st.button('🔄 Reset All'):
             for k in ('model', 'courses_df', 'courses_emb', 'matches'):
                 st.session_state[k] = None if k != 'matches' else {}
             st.experimental_rerun()
 
     if st.session_state.show_help:
-        st.markdown('<div class="help-text"><h3>How to Use</h3><ol><li>Start model</li><li>Load catalog</li><li>Add courses</li><li>Analyze transfer</li></ol></div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="help-text">'
+            '<h3>How to Use</h3>'
+            '<ol>'
+            '<li><strong>Start the Model:</strong> Click **Start Model** in the sidebar.</li>'
+            '<li><strong>Load the Course Catalog:</strong> Select **W&M Catalog** or upload your CSV.</li>'
+            '<li><strong>Add Your Courses:</strong> Enter the title, description, optional keywords, and level.</li>'
+            '<li><strong>Analyze Transfer:</strong> Click **Analyze Courses** to view transfer results.</li>'
+            '</ol>'
+            '</div>',
+            unsafe_allow_html=True
+        )
 
     # Step 1: Load catalog
     st.markdown('<div class="step-header">📁 Step 1: Load Catalog</div>', unsafe_allow_html=True)
     if src == 'Upload CSV':
         file = st.file_uploader('CSV', type='csv')
     else:
-        file = 'url'; st.info('Using built-in catalog')
+        file = 'url'; st.info('Using W&M Catalog')
     if file and st.session_state.model and st.button('📂 Load Catalog'):
         df = checker.load_csv_data('url' if src != 'Upload CSV' else file)
         if df is not None:
@@ -180,7 +210,7 @@ def main():
             with st.expander(f'Course {i+1}', expanded=i<2):
                 t = st.text_input('Title', key=f't{i}')
                 d = st.text_area('Description', key=f'd{i}')
-                k = st.text_input('Keywords', key=f'к{i}')
+                k = st.text_input('Keywords', key=f'k{i}')
                 l = st.selectbox('Level', [None, 100, 200, 300, 400], key=f'l{i}', format_func=lambda x: 'Any' if x is None else f'{x}')
             if t and d:
                 external.append({'title': t, 'description': d, 'keywords': k, 'target_level': l})
@@ -195,7 +225,6 @@ def main():
     if st.session_state.matches:
         st.markdown('<div class="step-header">✅ Results</div>', unsafe_allow_html=True)
         total = len(external)
-        # categorize each course by top 3 consensus
         counts = {'very_likely': 0, 'likely': 0, 'review': 0}
         course_cats = {}
         for idx, hits in st.session_state.matches.items():
