@@ -455,7 +455,7 @@ def main():
                     title = st.text_input(f"Course Title", key=f"title_{i}", 
                                         placeholder="e.g., Introduction to Psychology")
                     description = st.text_area(f"Course Description", key=f"desc_{i}",
-                                             placeholder="Describe what you learned in this course...",
+                                             placeholder="Enter the school's official course description here...",
                                              height=100)
                 
                 with col2:
