@@ -430,11 +430,11 @@ def main():
     # Help instructions
     if st.session_state.show_help:
         st.markdown("""
-        <div style='background:#f8f9fa;padding:1rem;border-left:4px solid #1f77b4'>
+        <div style='padding:1rem;border-left:4px solid #1f77b4'>
         <h3>📖 How to Use TransferzAI</h3>
         <ol>
             <li><strong>Start the Model</strong> in the sidebar (required for analysis)</li>
-            <li><strong>Load Course Catalog</strong> (upload CSV or use sample dataset)</li>
+            <li><strong>Load Course Catalog</strong> (upload CSV or use W&M Catalog)</li>
             <li><strong>Add External Courses</strong> with title, description, and optional filters</li>
             <li><strong>Analyze</strong> to find matching courses with transferability scores</li>
         </ol>
