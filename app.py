@@ -14,65 +14,60 @@ import tempfile
 # =======================
 st.set_page_config(page_title="TransferzAI", page_icon="🎓", layout="wide")
 
-# === Minimal Gradient UI (No White Background) ===
+# === Gradient background, NO white boxes ===
 st.markdown("""
 <style>
-/* Soft gradient background */
 [data-testid="stAppViewContainer"] {
-    background: linear-gradient(160deg, #eef2ff 0%, #f5f7ff 50%, #f7faff 100%);
+    background: linear-gradient(160deg, #eef2ff 0%, #f5f7ff 40%, #eaefff 100%);
     color: #1a1a1a;
 }
 
-/* Header gradient text */
+/* Title gradient text */
 .main-header {
-    font-size: 3.2rem;
+    font-size: 3rem;
     text-align: center;
-    font-weight: 700;
+    font-weight: 800;
     background: linear-gradient(135deg, #4e6af3, #8a3ef3);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: 1.8rem;
+    margin-bottom: 1.2rem;
 }
 
 /* Section headers */
 .step-header {
-    font-size: 1.7rem;
-    font-weight: 600;
-    margin: 1.5rem 0 1rem;
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 1.5rem 0 0.8rem;
     color: #333;
 }
 
-/* Thin dividers between sections */
+/* Ultra-thin dividers */
 .section-divider {
     border: none;
     height: 1px;
-    background: linear-gradient(90deg, rgba(102,126,234,0.3), rgba(118,75,162,0.3));
-    margin: 20px 0;
+    background: rgba(102,126,234,0.3);
+    margin: 14px 0;
 }
 
-/* Help container (transparent) */
+/* Help list */
 .help-container {
     padding-left: 15px;
-    border-left: 3px solid #667eea;
+    border-left: 3px solid rgba(102,126,234,0.4);
 }
-.help-container h3 { font-size: 1.3rem; margin-bottom: 10px; }
-.help-container ol li { padding: 3px 0; }
+.help-container h3 { font-size: 1.3rem; margin-bottom: 8px; }
+.help-container ol li { padding: 2px 0; }
 
-/* Transfer result box */
-.transfer-result {
-    backdrop-filter: blur(6px);
-    border: 1px solid rgba(102,126,234,0.2);
-    padding: 15px;
-    border-radius: 12px;
-    margin-bottom: 10px;
+/* Transfer result simple styling */
+.transfer-line {
+    font-size: 1.05rem;
+    margin: 6px 0;
 }
 
-/* Metric summary */
+/* Summary lines */
 .metric-summary {
-    padding: 12px;
-    border-radius: 8px;
-    font-weight: 600;
-    text-align: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-top: 6px;
 }
 .metric-summary.good { color: #28a745; }
 .metric-summary.review { color: #ffc107; }
@@ -208,7 +203,7 @@ def find_matches(external,model,df,embs):
         ext_emb=model.encode([ext_text])
         sims=cosine_similarity(ext_emb,sub_emb)[0]
         if tgt: sims+=sub_df['level'].apply(lambda x:level_bonus(x,tgt)).to_numpy()
-        top_idx=np.argpartition(sims,-min(5,len(sims)))[-min(5,len(sims)):]
+        top_idx=np.argpartition(sims,-min(3,len(sims)))[-min(3,len(sims)):]
         top_sorted=top_idx[np.argsort(sims[top_idx])[::-1]]
         matches=[]
         for i in top_sorted:
@@ -260,6 +255,7 @@ def main():
                 else: st.error("❌ Failed.")
     else:
         st.markdown("✅ **Model Loaded**")
+    st.markdown("<hr class='section-divider'>",unsafe_allow_html=True)
 
     # Step 1: Catalog
     st.markdown('<h2 class="step-header">📁 Load Course Catalog</h2>',unsafe_allow_html=True)
@@ -279,12 +275,12 @@ def main():
                         if e is not None: st.session_state.courses_emb=e; st.success("Embeddings Ready!")
                         else: st.error("Embedding failed")
 
-    # Catalog info
     if st.session_state.courses_df is not None:
+        df=st.session_state.courses_df
         with st.expander("Catalog Overview"):
-            df=st.session_state.courses_df
             st.write(f"**Total Courses:** {len(df)} | Levels: {df['level'].nunique()}")
             st.dataframe(df[['course_code','course_title']].head())
+    st.markdown("<hr class='section-divider'>",unsafe_allow_html=True)
 
     # Step 2: External
     if st.session_state.courses_df is not None and st.session_state.model is not None:
@@ -309,6 +305,7 @@ def main():
                     st.session_state.matches=m
                     if m: st.success("Done!"); st.balloons()
                     else: st.warning("No matches.")
+    st.markdown("<hr class='section-divider'>",unsafe_allow_html=True)
 
     # Step 3: Results
     if st.session_state.matches:
@@ -318,19 +315,16 @@ def main():
             ext=st.session_state.external_courses[idx]
             st.subheader(f"📘 {ext['title']}")
             if not matches: st.warning("No matches"); continue
-            top=matches[0]
-            pct=round(top['transfer_score']*100,1)
-            st.markdown(f"""
-            <div class="transfer-result">
-            <h4>{top['emoji']} {top['category']}</h4>
-            <p><strong>{pct}%</strong> chance to transfer as **{top['code']} – {top['title']}**</p>
-            </div>
-            """,unsafe_allow_html=True)
-            # Count category for summary
-            if top['category'] in ["Very High Transferability","Likely Transferable"]: total_good+=1
-            elif top['category']=="Possibly Transferable": total_review+=1
+            for rank,top in enumerate(matches,1):
+                pct=round(top['transfer_score']*100,1)
+                st.markdown(f"<div class='transfer-line'>#{rank} {top['emoji']} <b>{top['category']}</b> → {pct}% → {top['code']} – {top['title']}</div>",unsafe_allow_html=True)
+            # count only best match for summary
+            cat=matches[0]['category']
+            if cat in ["Very High Transferability","Likely Transferable"]: total_good+=1
+            elif cat=="Possibly Transferable": total_review+=1
             else: total_bad+=1
-        st.markdown("<hr class='section-divider'>",unsafe_allow_html=True)
+            st.markdown("<hr class='section-divider'>",unsafe_allow_html=True)
+
         st.subheader("📊 Summary")
         st.markdown(f"<div class='metric-summary good'>✅ Likely Transfer: {total_good}</div>",unsafe_allow_html=True)
         st.markdown(f"<div class='metric-summary review'>🟡 Need Review: {total_review}</div>",unsafe_allow_html=True)
