@@ -310,9 +310,13 @@ def main():
             for m in matches:
                 pct = round(m['transfer_score'] * 100, 1)
                 st.markdown(f"{m['emoji']} **{m['category']}** ({pct}% probability)")
-                st.markdown(f"- **{m['code']}**: {m['title']}  
-                             DescSim={m['sim_desc']:.3f}, TitleSim={m['sim_title']:.3f}, AdjustedSim={m['sim_adjusted']:.3f}")
-            st.markdown("---")
+    # show details cleanly
+                st.markdown(f"""
+            - **{m['code']}**: {m['title']}
+                • DescSim: {m['sim_desc']:.3f}  
+                • TitleSim: {m['sim_title']:.3f}  
+                • AdjustedSim: {m['sim_adjusted']:.3f}
+            """)
 
 if __name__ == "__main__":
     main()
