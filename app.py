@@ -768,7 +768,8 @@ def main():
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
                 st.markdown("### Ready to Analyze")
-                st.markdown(f"Analyzing **{len(external_courses)}** external course{'s' if len(external_courses) != 1 else ''} for transferability")
+                course_text = "courses" if len(external_courses) != 1 else "course"
+                st.markdown(f"Analyzing **{len(external_courses)}** external {course_text} for transferability")
                 if st.button("Start Analysis", key="analyze_button", help="Run AI analysis to find transferable courses"):
                     with st.spinner("🤖 AI is analyzing course transferability..."):
                         matches = find_matches_with_logit(
