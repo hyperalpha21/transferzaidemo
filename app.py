@@ -797,7 +797,7 @@ def main():
                     if matches:
                         st.success("✅ Analysis complete!")
                         st.balloons()
-                else:
+                    else:
                         st.warning("⚠️ No matches found. Try adjusting your course descriptions or keywords.")
 
 
