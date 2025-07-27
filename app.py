@@ -140,7 +140,7 @@ def load_csv(path):
     except: return None
 
 @st.cache_data
-def generate_embeddings(df, model):
+def generate_embeddings(df, _model):
     texts = (df['course_code']+" "+df['course_title']+" "+df['course_description']).tolist()
     return np.array(model.encode(texts, show_progress_bar=True))
 
