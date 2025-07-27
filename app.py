@@ -142,7 +142,7 @@ def load_csv(path):
 @st.cache_data
 def generate_embeddings(df, _model):
     texts = (df['course_code']+" "+df['course_title']+" "+df['course_description']).tolist()
-    return np.array(model.encode(texts, show_progress_bar=True))
+    return np.array(_model.encode(texts, show_progress_bar=True))
 
 def find_matches(external, model, df, embeddings):
     results={}
