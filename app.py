@@ -123,7 +123,7 @@ def load_csv_data(source_path: str):
     return df
 
 @st.cache_data
-def generate_embeddings(df: pd.DataFrame, model):
+def generate_embeddings(df: pd.DataFrame, _model):
     texts = (df['course_code'] + ' ' + df['course_title'] + ' ' + df['course_description']).tolist()
     import hashlib
     key = hashlib.md5('|'.join(texts).encode()).hexdigest()
