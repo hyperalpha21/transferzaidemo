@@ -186,7 +186,8 @@ def find_matches_with_logit(external_courses, model, df, embeddings):
 
         # apply level bonus
         if target_level:
-            sims += sub_df['level'].apply(lambda x: level_bonus(x, target_level)).values
+            level_bonus_array = sub_df['level'].apply(lambda x: level_bonus(x, target_level)).to_numpy()
+            sims = sims + level_bonus_array
 
         # get top 5 indices
         top_idx = np.argpartition(sims, -5)[-5:]
