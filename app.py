@@ -784,20 +784,22 @@ def main():
                             st.balloons()
                         else:
                             st.warning("⚠️ No matches found. Try adjusting your course descriptions or keywords.")
-            st.markdown('</div>', unsafe_allow_html=True) Courses", type="primary", help="Run AI analysis to find transferable courses"):
-                    with st.spinner("🤖 AI is analyzing course transferability..."):
-                        matches = find_matches_with_logit(
-                            external_courses,
-                            st.session_state.model,
-                            st.session_state.courses_df,
-                            st.session_state.courses_emb
-                        )
-                        st.session_state.matches = matches
-                        if matches:
-                            st.success("✅ Analysis complete!")
-                            st.balloons()
-                        else:
-                            st.warning("⚠️ No matches found. Try adjusting your course descriptions or keywords.")
+            st.markdown('</div>', unsafe_allow_html=True)
+            if st.button("Analyze Courses", help="Run AI analysis to find transferable courses"):
+                with st.spinner("🤖 AI is analyzing course transferability..."):
+                    matches = find_matches_with_logit(
+                        external_courses,
+                        st.session_state.model,
+                        st.session_state.courses_df,
+                        st.session_state.courses_emb
+                    )
+                    st.session_state.matches = matches
+                    if matches:
+                        st.success("✅ Analysis complete!")
+                        st.balloons()
+                else:
+                        st.warning("⚠️ No matches found. Try adjusting your course descriptions or keywords.")
+
 
     # Step 4: Display Results
     if st.session_state.matches:
