@@ -17,16 +17,221 @@ st.set_page_config(page_title="TransferzAI", page_icon="🎓", layout="wide")
 
 st.markdown("""
 <style>
-.main-header { font-size: 2.5rem; color: #1f77b4; text-align: center; margin-bottom: 2rem; }
-.step-header { font-size: 1.4rem; color: #2e8b57; margin: 2rem 0; padding: 10px; background: #f0f8f0; border-radius: 8px; }
-.summary-card { padding: 20px; border-radius: 8px; text-align: center; }
-.summary-number { font-size: 3rem; font-weight: bold; }
-.summary-label { font-size: 1.2rem; margin-top: 5px; }
-.very-high-card { background-color: #c3e6cb; color: #155724; }
-.likely-card { background-color: #d4edda; color: #155724; }
-.possible-card { background-color: #fff3cd; color: #856404; }
-.unlikely-card { background-color: #ffe0b3; color: #8a6d3b; }
-.low-card { background-color: #f8d7da; color: #721c24; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=SF+Pro+Display:wght@300;400;500;600;700&display=swap');
+
+/* Modern, clean aesthetic inspired by top UI software */
+.main-header { 
+    font-family: 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 3.5rem; 
+    font-weight: 300;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-align: center; 
+    margin-bottom: 3rem;
+    letter-spacing: -0.02em;
+}
+
+.step-header { 
+    font-family: 'Inter', sans-serif;
+    font-size: 1.75rem; 
+    color: #1a1a1a; 
+    margin: 3rem 0 1.5rem 0; 
+    padding: 0;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.modern-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 32px;
+    margin: 24px 0;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modern-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12);
+}
+
+.primary-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 16px 32px;
+    border-radius: 12px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.24);
+    letter-spacing: -0.01em;
+}
+
+.primary-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.32);
+}
+
+.secondary-button {
+    background: #f8f9fa;
+    color: #495057;
+    border: 1px solid #e9ecef;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.secondary-button:hover {
+    background: #e9ecef;
+    transform: translateY(-1px);
+}
+
+.metric-display {
+    background: #f8f9ff;
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+    border: 1px solid #e6e8ff;
+}
+
+.metric-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #667eea;
+    font-family: 'SF Pro Display', sans-serif;
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+.metric-label {
+    font-size: 14px;
+    color: #6c757d;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.transfer-result-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 28px;
+    margin: 20px 0;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.transfer-result-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+.transfer-result-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.course-code {
+    background: #f1f3f9;
+    color: #495057;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-family: 'SF Pro Display', monospace;
+    font-weight: 600;
+    font-size: 14px;
+    display: inline-block;
+}
+
+.percentage-display {
+    font-family: 'SF Pro Display', sans-serif;
+    font-weight: 700;
+    font-size: 3rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+}
+
+.help-container {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.04) 0%, rgba(118, 75, 162, 0.04) 100%);
+    border: 1px solid rgba(102, 126, 234, 0.08);
+    border-radius: 20px;
+    padding: 32px;
+    margin: 32px 0;
+}
+
+.help-container h3 {
+    font-family: 'SF Pro Display', sans-serif;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 24px;
+    font-size: 1.5rem;
+}
+
+.help-container ol {
+    font-family: 'Inter', sans-serif;
+    line-height: 1.7;
+    color: #495057;
+}
+
+.help-container li {
+    margin-bottom: 12px;
+}
+
+.status-badge {
+    background: #d4edda;
+    color: #155724;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.upload-area {
+    border: 2px dashed #dee2e6;
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+    margin: 20px 0;
+}
+
+.upload-area:hover {
+    border-color: #667eea;
+    background: #f8f9ff;
+}
+
+/* Category specific colors */
+.very-high { color: #28a745; }
+.likely { color: #17a2b8; }
+.possible { color: #ffc107; }
+.unlikely { color: #fd7e14; }
+.low { color: #dc3545; }
+
+/* Smooth transitions for all interactive elements */
+* {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -390,34 +595,52 @@ def find_matches_with_logit(external_courses, model, df, embeddings):
 def main():
     initialize_session_state()
     
-    st.markdown('<h1 class="main-header">🎓 Welcome to TransferzAI</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🎓 TransferzAI</h1>', unsafe_allow_html=True)
+
+    # Help instructions with inline buttons
+    if st.session_state.show_help:
+        st.markdown("""
+        <div class='help-container'>
+        <h3>How to Use TransferzAI</h3>
+        <ol>
+            <li><strong>Start the Model:</strong> Click the button below to load the AI model (required for analysis)</li>
+            <li><strong>Load Course Catalog:</strong> Choose your data source and load the catalog</li>
+            <li><strong>Add External Courses:</strong> Input course details with title, description, and optional filters</li>
+            <li><strong>Analyze:</strong> Run the AI analysis to find matching courses with transferability scores</li>
+        </ol>
+        <p><strong>💡 CSV Format:</strong> Must contain columns: <span class="course-code">course_code</span>, <span class="course-code">course_title</span>, <span class="course-code">course_description</span></p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Model loading section
+    if not st.session_state.model:
+        st.markdown('<div class="modern-card">')
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown("### 🤖 AI Model Setup")
+            st.markdown("Initialize the AI model to begin course analysis")
+            if st.button("Start AI Model", key="start_model", help="Load the AI model for course analysis"):
+                with st.spinner("Loading AI model..."):
+                    st.session_state.model = load_model()
+                    if st.session_state.model:
+                        st.success("✅ Model loaded successfully!")
+                        st.balloons()
+                    else:
+                        st.error("❌ Failed to load model")
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown('<div class="status-badge">✅ AI Model Ready</div>', unsafe_allow_html=True)
 
     # Sidebar
     with st.sidebar:
-        st.title("📋 Menu")
+        st.title("📋 Control Panel")
         
         if st.button("ℹ️ Show/Hide Help"):
             st.session_state.show_help = not st.session_state.show_help
         
         st.markdown("---")
-        
-        # Model loading
-        if not st.session_state.model:
-            if st.button("🚀 Start Model"):
-                with st.spinner("Loading model..."):
-                    st.session_state.model = load_model()
-                    if st.session_state.model:
-                        st.success("Model loaded successfully!")
-                    else:
-                        st.error("Failed to load model")
-        else:
-            st.success("✅ Model loaded")
-        
-        st.markdown("---")
-        
-        # Course catalog selection
-        st.subheader("📁 Course Catalog")
-        src = st.radio("Source", ["Upload CSV", "W&M Catalog"], key="src")
         
         if st.button("🔄 Reset All"):
             for key in ['model', 'courses_df', 'courses_emb', 'matches', 'external_courses']:
@@ -427,63 +650,83 @@ def main():
                     st.session_state[key] = None
             st.rerun()
 
-    # Help instructions
-    if st.session_state.show_help:
-        st.markdown("""
-        <div style='padding:1rem;border-left:4px solid #1f77b4'>
-        <h3>📖 How to Use TransferzAI</h3>
-        <ol>
-            <li><strong>Start the Model</strong> in the sidebar (required for analysis)</li>
-            <li><strong>Load Course Catalog</strong> (upload CSV or use W&M Catalog)</li>
-            <li><strong>Add External Courses</strong> with title, description, and optional filters</li>
-            <li><strong>Analyze</strong> to find matching courses with transferability scores</li>
-        </ol>
-        <p><strong>CSV Format:</strong> Must contain columns: course_code, course_title, course_description</p>
-        </div>
-        """, unsafe_allow_html=True)
-
     # Step 1: Load catalog
-    st.markdown('<div class="step-header">📁 Step 1: Load Course Catalog</div>', unsafe_allow_html=True)
+    st.markdown('<div class="step-header">📁 Load Course Catalog</div>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="modern-card">')
+    # Course catalog selection
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        src = st.radio("**Choose Data Source**", ["Upload CSV", "W&M Catalog"], key="src", horizontal=True)
     
     file_to_process = None
     if src == "Upload CSV":
-        uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+        uploaded_file = st.file_uploader("Choose a CSV file", type="csv", help="Upload your course catalog CSV file")
         if uploaded_file:
             file_to_process = uploaded_file
-            st.info(f"📄 File uploaded: {uploaded_file.name}")
+            st.success(f"📄 File uploaded: {uploaded_file.name}")
     else:
         file_to_process = "url"
-        st.info("📊 Using W&M Catalog")
+        st.info("📊 Using William & Mary Course Catalog")
     
-    if file_to_process and st.session_state.model and st.button("📂 Load Catalog"):
-        with st.spinner("Loading catalog..."):
-            df = load_csv_data(file_to_process)
-            if df is not None:
-                st.session_state.courses_df = df
-                st.success(f"✅ Loaded {len(df)} courses")
-                
-                with st.spinner("Generating embeddings..."):
-                    embeddings = generate_embeddings(df, st.session_state.model)
-                    if embeddings is not None:
-                        st.session_state.courses_emb = embeddings
-                        st.success("✅ Embeddings generated successfully!")
-                    else:
-                        st.error("❌ Failed to generate embeddings")
+    # Centered load button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if file_to_process and st.session_state.model:
+            if st.button("Load Catalog", key="load_catalog", help="Load and process the course catalog"):
+                with st.spinner("Loading catalog..."):
+                    df = load_csv_data(file_to_process)
+                    if df is not None:
+                        st.session_state.courses_df = df
+                        st.success(f"✅ Loaded {len(df)} courses")
+                        
+                        with st.spinner("Generating embeddings..."):
+                            embeddings = generate_embeddings(df, st.session_state.model)
+                            if embeddings is not None:
+                                st.session_state.courses_emb = embeddings
+                                st.success("✅ Embeddings generated successfully!")
+                            else:
+                                st.error("❌ Failed to generate embeddings")
+        elif not st.session_state.model:
+            st.info("⚠️ Please start the AI model first")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # Show catalog info if loaded
     if st.session_state.courses_df is not None:
-        with st.expander("📊 Catalog Information"):
+        with st.expander("📊 Catalog Overview", expanded=False):
             df = st.session_state.courses_df
-            st.write(f"**Total Courses:** {len(df)}")
-            st.write(f"**Sample Courses:**")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown('<div class="metric-display">')
+                st.markdown(f'<div class="metric-number">{len(df)}</div>', unsafe_allow_html=True)
+                st.markdown('<div class="metric-label">Total Courses</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+            with col2:
+                st.markdown('<div class="metric-display">')
+                departments = df['course_code'].str[:4].nunique() if 'course_code' in df.columns else 0
+                st.markdown(f'<div class="metric-number">{departments}</div>', unsafe_allow_html=True)
+                st.markdown('<div class="metric-label">Departments</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+            with col3:
+                st.markdown('<div class="metric-display">')
+                levels = df['level'].nunique() if 'level' in df.columns else 0
+                st.markdown(f'<div class="metric-number">{levels}</div>', unsafe_allow_html=True)
+                st.markdown('<div class="metric-label">Course Levels</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown("**Sample Courses:**")
             st.dataframe(df[['course_code', 'course_title']].head(), use_container_width=True)
 
     # Step 2: Add external courses
     external_courses = []
     if st.session_state.courses_df is not None and st.session_state.model is not None:
-        st.markdown('<div class="step-header">📚 Step 2: Add Your External Courses</div>', unsafe_allow_html=True)
+        st.markdown('<div class="step-header">📚 Add Your External Courses</div>', unsafe_allow_html=True)
         
-        num_courses = st.slider("Number of courses to analyze", 1, 10, 3)
+        st.markdown('<div class="modern-card">')
+        num_courses = st.slider("Number of courses to analyze", 1, 10, 3, help="Select how many external courses you want to analyze")
         
         for i in range(num_courses):
             with st.expander(f"📝 Course {i+1}", expanded=(i < 2)):
@@ -491,15 +734,19 @@ def main():
                 
                 with col1:
                     title = st.text_input("Course Title", key=f"title_{i}", 
-                                        placeholder="e.g., Introduction to Computer Science")
-                    description = st.text_area("Course Description", key=f"desc_{i}", height=100,
-                                             placeholder="Detailed description of the course content...")
+                                        placeholder="e.g., Introduction to Computer Science",
+                                        help="Enter the full title of your external course")
+                    description = st.text_area("Course Description", key=f"desc_{i}", height=120,
+                                             placeholder="Provide a detailed description of the course content, topics covered, and learning objectives...",
+                                             help="The more detailed the description, the better the AI can match it")
                 
                 with col2:
                     keywords = st.text_input("Keywords (optional)", key=f"keywords_{i}",
-                                           placeholder="math, science, programming")
+                                           placeholder="math, science, programming",
+                                           help="Add keywords to help filter matching courses")
                     level = st.selectbox("Target Level", [None, 100, 200, 300, 400], key=f"level_{i}",
-                                       format_func=lambda x: "Any Level" if x is None else f"{x}-level")
+                                       format_func=lambda x: "Any Level" if x is None else f"{x}-level",
+                                       help="Course level to prioritize in matching (100=freshman, 400=senior)")
                 
                 if title and description:
                     external_courses.append({
@@ -508,75 +755,131 @@ def main():
                         'keywords': keywords.strip() if keywords else '',
                         'target_level': level
                     })
+        st.markdown('</div>', unsafe_allow_html=True)
 
         # Store external courses in session state
         st.session_state.external_courses = external_courses
 
         # Step 3: Analyze
         if external_courses:
-            st.markdown('<div class="step-header">🔍 Step 3: Analyze Transferability</div>', unsafe_allow_html=True)
+            st.markdown('<div class="step-header">🔍 Run AI Analysis</div>', unsafe_allow_html=True)
             
-            if st.button("🚀 Analyze Courses", type="primary"):
-                with st.spinner("Analyzing course transferability..."):
-                    matches = find_matches_with_logit(
-                        external_courses,
-                        st.session_state.model,
-                        st.session_state.courses_df,
-                        st.session_state.courses_emb
-                    )
-                    st.session_state.matches = matches
-                    if matches:
-                        st.success("✅ Analysis complete!")
-                    else:
-                        st.warning("⚠️ No matches found. Try adjusting your course descriptions or keywords.")
+            st.markdown('<div class="modern-card">')
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.markdown("### Ready to Analyze")
+                st.markdown(f"Analyzing **{len(external_courses)}** external course{'s' if len(external_courses) != 1 else ''} for transferability")
+                if st.button("Start Analysis", key="analyze_button", help="Run AI analysis to find transferable courses"):
+                    with st.spinner("🤖 AI is analyzing course transferability..."):
+                        matches = find_matches_with_logit(
+                            external_courses,
+                            st.session_state.model,
+                            st.session_state.courses_df,
+                            st.session_state.courses_emb
+                        )
+                        st.session_state.matches = matches
+                        if matches:
+                            st.success("✅ Analysis complete!")
+                            st.balloons()
+                        else:
+                            st.warning("⚠️ No matches found. Try adjusting your course descriptions or keywords.")
+            st.markdown('</div>', unsafe_allow_html=True) Courses", type="primary", help="Run AI analysis to find transferable courses"):
+                    with st.spinner("🤖 AI is analyzing course transferability..."):
+                        matches = find_matches_with_logit(
+                            external_courses,
+                            st.session_state.model,
+                            st.session_state.courses_df,
+                            st.session_state.courses_emb
+                        )
+                        st.session_state.matches = matches
+                        if matches:
+                            st.success("✅ Analysis complete!")
+                            st.balloons()
+                        else:
+                            st.warning("⚠️ No matches found. Try adjusting your course descriptions or keywords.")
 
     # Step 4: Display Results
     if st.session_state.matches:
-        st.markdown('<div class="step-header">📊 Step 4: Transfer Analysis Results</div>', unsafe_allow_html=True)
+        st.markdown('<div class="step-header">🎯 Step 4: Transfer Analysis Results</div>', unsafe_allow_html=True)
+        st.markdown("*Percentage represents the probability that your external course will transfer as equivalent to the matched course*")
         
         for idx, matches in st.session_state.matches.items():
             if idx < len(st.session_state.external_courses):
                 external_course = st.session_state.external_courses[idx]
                 
-                st.subheader(f"📘 External Course {idx+1}: {external_course['title']}")
+                st.markdown(f"### 📘 External Course {idx+1}: {external_course['title']}")
                 
                 if not matches:
                     st.warning("No suitable matches found for this course.")
                     continue
                 
-                # Display matches
+                # Display matches with enhanced styling
                 for rank, match in enumerate(matches, 1):
                     pct = round(match['transfer_score'] * 100, 1)
                     
-                    with st.container():
-                        col1, col2 = st.columns([3, 1])
+                    # Create styled result container
+                    st.markdown(f"""
+                    <div class="transfer-result">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <div>
+                                <h4 style="margin: 0; color: #64ffda;">#{rank} {match['emoji']} {match['category']}</h4>
+                                <p style="margin: 4px 0 0 0; color: #888;">
+                                    <span class="percentage-text">{pct}%</span> chance of transferring as this class
+                                </p>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 2rem; font-weight: bold; color: #667eea;">{pct}%</div>
+                            </div>
+                        </div>
+                        <div>
+                            <p style="margin: 8px 0; font-size: 1.1em;">
+                                <span class="code-text">{match['code']}</span>: <strong>{match['title']}</strong>
+                            </p>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Detailed metrics in expander
+                    with st.expander("📊 Detailed Analysis Metrics", expanded=False):
+                        col1, col2, col3 = st.columns(3)
                         
                         with col1:
-                            st.markdown(f"""
-                            **#{rank} {match['emoji']} {match['category']}** ({pct}% probability)
-                            
-                            **{match['code']}**: {match['title']}
-                            """)
+                            st.metric(
+                                "Description Similarity", 
+                                f"{match['sim_desc']:.3f}",
+                                help="How similar the course descriptions are (0-1 scale)"
+                            )
+                            st.metric(
+                                "Title Similarity", 
+                                f"{match['sim_title']:.3f}",
+                                help="How similar the course titles are (0-1 scale)"
+                            )
                         
                         with col2:
-                            st.metric("Transfer Score", f"{pct}%")
+                            st.metric(
+                                "Base Similarity", 
+                                f"{match['sim_original']:.3f}",
+                                help="Raw similarity score before adjustments"
+                            )
+                            st.metric(
+                                "Adjusted Similarity", 
+                                f"{match['sim_adjusted']:.3f}",
+                                help="Similarity score after level and keyword adjustments"
+                            )
                         
-                        # Detailed metrics
-                        with st.expander("📈 Detailed Metrics"):
-                            metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
-                            
-                            with metrics_col1:
-                                st.metric("Description Similarity", f"{match['sim_desc']:.3f}")
-                                st.metric("Title Similarity", f"{match['sim_title']:.3f}")
-                            
-                            with metrics_col2:
-                                st.metric("Original Similarity", f"{match['sim_original']:.3f}")
-                                st.metric("Adjusted Similarity", f"{match['sim_adjusted']:.3f}")
-                            
-                            with metrics_col3:
-                                st.metric("Level Bonus", f"{match['level_bonus']:.3f}")
-                        
-                        st.markdown("---")
+                        with col3:
+                            st.metric(
+                                "Level Bonus", 
+                                f"{match['level_bonus']:.3f}",
+                                help="Bonus points for matching course levels (100, 200, 300, 400)"
+                            )
+                            st.metric(
+                                "AI Transfer Score", 
+                                f"{match['transfer_score']:.3f}",
+                                help="Final AI-computed probability of successful transfer (0-1 scale)"
+                            )
+                
+                st.markdown("---")
 
 if __name__ == "__main__":
     main()
