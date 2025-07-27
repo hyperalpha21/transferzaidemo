@@ -138,9 +138,14 @@ def load_csv_data(source_path):
     
     # Handle different source types
     if source_path == 'url':
-        # Create a sample dataset if no URL is available
-        st.warning("URL source not available. Creating sample dataset.")
-        df = create_sample_dataset()
+        # Use the original W&M catalog loading logic
+        path = 'wm_courses_2025.csv'
+        for enc in encodings:
+            try:
+                df = pd.read_csv(path, encoding=enc)
+                break
+            except Exception:
+                continue
     elif hasattr(source_path, 'read'):
         # Handle uploaded file
         for enc in encodings:
@@ -412,7 +417,7 @@ def main():
         
         # Course catalog selection
         st.subheader("📁 Course Catalog")
-        src = st.radio("Source", ["Upload CSV", "Sample Dataset"], key="src")
+        src = st.radio("Source", ["Upload CSV", "W&M Catalog"], key="src")
         
         if st.button("🔄 Reset All"):
             for key in ['model', 'courses_df', 'courses_emb', 'matches', 'external_courses']:
@@ -447,8 +452,8 @@ def main():
             file_to_process = uploaded_file
             st.info(f"📄 File uploaded: {uploaded_file.name}")
     else:
-        file_to_process = "sample"
-        st.info("📊 Using sample dataset for demonstration")
+        file_to_process = "url"
+        st.info("📊 Using W&M Catalog")
     
     if file_to_process and st.session_state.model and st.button("📂 Load Catalog"):
         with st.spinner("Loading catalog..."):
