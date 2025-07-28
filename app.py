@@ -257,8 +257,8 @@ def main():
             with st.expander(f"External Course {i+1}", expanded=(i == 0)):
                 c1, c2 = st.columns(2)
                 with c1:
-                    t = st.text_input("Title", key=f"t{i}", placeholder="e.g., Introduction to Psychology")
-                    k = st.text_input("Keywords", key=f"k{i}", placeholder="e.g., cognitive, behavior, research")
+                    st.markdown(f'<label style="font-weight:600;">Title <span style="color:red; vertical-align:super;">*</span></label>', unsafe_allow_html=True); t = st.text_input("", key=f"t{i}", placeholder="e.g., Introduction to Psychology")
+                    st.markdown(f'<label style="font-weight:600;">Description <span style="color:red; vertical-align:super;">*</span></label>', unsafe_allow_html=True); d = st.text_area("", key=f"d{i}", height=100, placeholder="Detailed course description...")
                 with c2:
                     level_choice = st.selectbox(
                         "Target Level",
