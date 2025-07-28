@@ -12,8 +12,7 @@ import math
 # =======================
 st.set_page_config(page_title="TransferzAI", page_icon="🎓", layout="wide")
 
-st.markdown("""
-<style>
+st.markdown('''<style>
 html, body, .stApp, .block-container {
     background-color: #0d1b2a !important;
     color: #f0f4f8 !important;
@@ -24,7 +23,7 @@ html, body, .stApp, .block-container {
 }
 h1, h2, h3, h4, h5 {
     color: #f0f4f8 !important;
-    font-family: 'Inter', sans-serif;
+    font-family: Inter, sans-serif;
     font-weight: 600;
 }
 .main-header {
@@ -73,20 +72,20 @@ textarea, input, select {
     border-radius: 8px !important;
 }
 .dataframe { background: rgba(255,255,255,0.03); color: #f0f4f8; }
-</style>
-""", unsafe_allow_html=True)
+</style>''', unsafe_allow_html=True)
 
 # =======================
 # SESSION STATE DEFAULTS
 # =======================
 def init_state():
-    for k, v in {
+    defaults = {
         "model": None,
         "courses_df": None,
         "courses_emb": None,
         "matches": {},
         "external_courses": []
-    }.items():
+    }
+    for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
@@ -97,7 +96,7 @@ def extract_level(code: str):
     if not code:
         return None
     try:
-        m = re.search(r"(\d{3,4})", str(code))
+        m = re.search(r"(\d{3,4})", code)
         if not m:
             return None
         n = int(m.group(1))
@@ -118,19 +117,19 @@ def calculate_transferability_score(t1, d1, t2, d2, model):
         title_embs = model.encode([t1, d2])
         sim_title = cosine_similarity([title_embs[0]], [title_embs[1]])[0][0]
         logit = -7.144 + 9.219 * sim_desc + 5.141 * sim_title
-        return sim_desc, sim_title, 1 / (1 + math.exp(-logit))
+        score = 1 / (1 + math.exp(-logit))
+        return sim_desc, sim_title, score
     except:
-        return 0, 0, 0
+        return 0.0, 0.0, 0.0
 
 def classify_score(score):
     if score >= 0.85:
         return "Very Likely", "🟢"
-    elif score >= 0.7:
+    if score >= 0.7:
         return "Pretty Likely", "🔵"
-    elif score >= 0.6:
+    if score >= 0.6:
         return "Likely", "🟡"
-    else:
-        return "Unlikely", "🔴"
+    return "Unlikely", "🔴"
 
 @st.cache_resource
 def load_model():
@@ -142,7 +141,7 @@ def load_model():
 @st.cache_data
 def load_csv(path):
     try:
-        df = pd.read_csv(path, encoding="latin1")
+        df = pd.read_csv(path, encoding='latin1')
         df = df.dropna(subset=['course_title', 'course_description'])
         df['course_code'] = df['course_code'].astype(str).str.strip()
         df['level'] = df['course_code'].apply(extract_level)
@@ -152,174 +151,190 @@ def load_csv(path):
 
 @st.cache_data
 def generate_embeddings(df, _model):
-    texts = (df['course_code'] + " " + df['course_title'] + " " + df['course_description']).tolist()
+    texts = (df['course_code'] + ' ' + df['course_title'] + ' ' + df['course_description']).tolist()
     return np.array(_model.encode(texts, show_progress_bar=True))
 
 def find_matches(external, model, df, embeddings):
     results = {}
     for idx, course in enumerate(external):
-        title, desc, kw, lvl = course['title'], course['description'], course['keywords'], course['target_level']
-        ext_text = f"{title} {desc} {kw}" if kw else f"{title} {desc}"
+        title, desc, keywords, lvl = course.values()
+        ext_text = f"{title} {desc} {keywords or ''}"
         ext_emb = model.encode([ext_text])
         sims = cosine_similarity(ext_emb, embeddings)[0]
         if lvl:
             sims += df['level'].apply(lambda x: level_bonus(x, lvl)).values
-        top_idx = np.argpartition(sims, -5)[-5:]
-        sorted_idx = top_idx[np.argsort(sims[top_idx])[::-1]]
+        top5 = np.argpartition(sims, -5)[-5:]
+        sorted_idx = top5[np.argsort(sims[top5])[::-1]]
         matches = []
         for i in sorted_idx:
             row = df.iloc[i]
-            sdesc, stitle, score = calculate_transferability_score(title, desc, row['course_title'], row['course_description'], model)
+            sdesc, stitle, score = calculate_transferability_score(
+                title, desc,
+                row['course_title'], row['course_description'],
+                model
+            )
             cat, emoji = classify_score(score)
             matches.append({
-                "code": row['course_code'],
-                "title": row['course_title'],
-                "score": score,
-                "cat": cat,
-                "emoji": emoji,
-                "sim_desc": sdesc,
-                "sim_title": stitle,
-                "description": row['course_description'][:200] + "..."
+                'code': row['course_code'],
+                'title': row['course_title'],
+                'score': score,
+                'cat': cat,
+                'emoji': emoji,
+                'sim_desc': sdesc,
+                'sim_title': stitle,
+                'description': row['course_description'][:200] + '...'
             })
         results[idx] = matches
     return results
 
 # =======================
-# UI
+# MAIN UI
 # =======================
 def main():
     init_state()
+
     st.markdown('<h1 class="main-header">🎓 TransferzAI</h1>', unsafe_allow_html=True)
-    st.markdown("""
-    <div class='modern-card'>
-    <p>We use math and machine learning to estimate the transferability of a prospective student's courses based on their previous courses taken.</p>
-    <p>Simply load the model, upload a CSV file of your courses or use the built-in W&M catalog, then enter all student course titles and descriptions. You will be shown how many of the classes the student is bringing in are likely to transfer!</p>
+    st.markdown('''
+    <div class="modern-card">
+      <p>We use math and machine learning to estimate course transferability based on your catalog.</p>
+      <p>Load the model, upload or use the built‑in catalog, enter external courses, and see match likelihoods!</p>
     </div>
-    """, unsafe_allow_html=True)
+    ''', unsafe_allow_html=True)
+    st.info('Disclaimer: 1–2 credit labs may have less certain results.')
 
-    st.info("Disclaimer: TransferzAI currently focuses primarily on matching **3–4 credit courses** (like lectures). 1–2 credit courses such as labs may have less certain results.")
-
+    # Sidebar reset
     with st.sidebar:
-        st.title("Controls")
-        if st.button("Reset App"):
-            for k in ["model", "courses_df", "courses_emb", "matches", "external_courses"]:
-                st.session_state[k] = None if k != "matches" else {}
+        st.title('Controls')
+        if st.button('Reset App'):
+            for k in ['model','courses_df','courses_emb','matches','external_courses']:
+                st.session_state[k] = {} if k == 'matches' else None
             st.rerun()
 
+    # Model loader
     if not st.session_state.model:
-        st.write("### 🤖 Load AI Model")
-        if st.button("Start AI Model"):
-            with st.spinner("Loading model..."):
+        st.write('### 🤖 Load AI Model')
+        if st.button('Start AI Model'):
+            with st.spinner('Loading model…'):
                 m = load_model()
                 if m:
                     st.session_state.model = m
-                    st.success("✅ Model ready!")
+                    st.success('✅ Model ready!')
                     st.rerun()
     else:
-        st.write("✅ **Model Loaded**")
+        st.write('✅ **Model Loaded**')
 
+    # Course catalog
     st.markdown('<div class="step-header">📁 Load Course Catalog</div>', unsafe_allow_html=True)
     if st.session_state.model:
-        src = st.radio("Source", ["W&M Catalog", "Upload CSV"])
+        src = st.radio('Source', ['W&M Catalog', 'Upload CSV'])
         file_to_load = None
-        if src == "W&M Catalog" and os.path.exists("wm_courses_2025.csv"):
-            file_to_load = "wm_courses_2025.csv"
+        if src == 'W&M Catalog' and os.path.exists('wm_courses_2025.csv'):
+            file_to_load = 'wm_courses_2025.csv'
         else:
-            uploaded = st.file_uploader("Upload Catalog CSV", type="csv")
-            if uploaded:
-                file_to_load = uploaded
-        if file_to_load and st.button("Load Catalog"):
-            with st.spinner("Processing catalog..."):
+            up = st.file_uploader('Upload Catalog CSV', type='csv')
+            if up:
+                file_to_load = up
+        if file_to_load and st.button('Load Catalog'):
+            with st.spinner('Processing catalog…'):
                 df = load_csv(file_to_load)
                 if df is not None:
                     st.session_state.courses_df = df
                     emb = generate_embeddings(df, st.session_state.model)
-                    if emb is not None:
-                        st.session_state.courses_emb = emb
-                        st.success(f"✅ Loaded {len(df)} courses")
+                    st.session_state.courses_emb = emb
+                    st.success(f'✅ Loaded {len(df)} courses')
     else:
-        st.info("Please start AI model first")
+        st.info('Please start AI model first')
 
+    # Catalog preview
     if st.session_state.courses_df is not None:
         df = st.session_state.courses_df
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Courses", len(df))
-        col2.metric("Levels", df['level'].nunique())
-        col3.metric("Embeddings Ready", "Yes" if st.session_state.courses_emb is not None else "No")
-        with st.expander("Preview Catalog"):
-            st.dataframe(df[['course_code', 'course_title', 'level']].head())
+        c1, c2, c3 = st.columns(3)
+        c1.metric('Total Courses', len(df))
+        c2.metric('Levels', df['level'].nunique())
+        c3.metric('Embeddings Ready', 'Yes' if st.session_state.courses_emb is not None else 'No')
+        with st.expander('Preview Catalog'):
+            st.dataframe(df[['course_code','course_title','level']].head())
 
-    if st.session_state.courses_df is not None and st.session_state.courses_emb is not None:
+    # External courses & analysis
+    if st.session_state.courses_df and st.session_state.courses_emb is not None:
         st.markdown('<div class="step-header">📚 Add External Courses</div>', unsafe_allow_html=True)
-        n = st.slider("How many external courses?", 1, 15, 2)
+        n = st.slider('How many external courses?', 1, 15, 2)
         external = []
         for i in range(n):
-            with st.expander(f"External Course {i+1}", expanded=(i == 0)):
+            with st.expander(f'External Course {i+1}', expanded=(i==0)):
                 c1, c2 = st.columns(2)
                 with c1:
-                    t = st.text_input("Title (required)", key=f"t{i}", placeholder="e.g., Introduction to Psychology")
-                    d = st.text_area("Description (required)", key=f"d{i}", height=100, placeholder="Detailed course description...")
+                    title = st.text_input('Title (required)', key=f'title_{i}',
+                                          placeholder='e.g., Intro to Psychology')
+                    desc  = st.text_area('Description (required)', key=f'desc_{i}', height=100,
+                                         placeholder='Detailed course description…')
+                    keywords = st.text_input('Keywords (optional)', key=f'keywords_{i}')
                 with c2:
-                    level_choice = st.selectbox(
-                        "Target Level",
-                        ["Any Level", "100-level", "200-level", "300-level", "400-level"],
-                        index=0,
-                        key=f"l{i}",
-                        help="Course level for better matching"
-                    )
-                    if not level_choice or level_choice == "Any Level":
-                        l = None
-                    elif isinstance(level_choice, str) and "-" in level_choice:
-                        l = int(level_choice.split("-")[0])
+                    lvl_choice = st.selectbox('Target Level',
+                                              ['Any Level','100-level','200-level','300-level','400-level'],
+                                              index=0, key=f'level_{i}')
+                    if lvl_choice == 'Any Level':
+                        lvl = None
                     else:
-                        l = None
-                d = st.text_area("Description (required)", key=f"d{i}", height=100, placeholder="Detailed course description...")
-                if t and d:
-                    external.append({'title': t, 'description': d, 'keywords': k, 'target_level': l})
-        if external and st.button("🔍 Analyze", type="primary"):
-            with st.spinner("Analyzing..."):
-                matches = find_matches(external, st.session_state.model, st.session_state.courses_df, st.session_state.courses_emb)
+                        lvl = int(lvl_choice.split('-')[0])
+                if title and desc:
+                    external.append({
+                        'title': title,
+                        'description': desc,
+                        'keywords': keywords,
+                        'target_level': lvl
+                    })
+
+        if external and st.button('🔍 Analyze', type='primary'):
+            with st.spinner('Analyzing…'):
+                matches = find_matches(
+                    external,
+                    st.session_state.model,
+                    st.session_state.courses_df,
+                    st.session_state.courses_emb
+                )
                 st.session_state.external_courses = external
                 st.session_state.matches = matches
-                st.success("✅ Analysis complete!")
+                st.success('✅ Analysis complete!')
                 st.rerun()
 
+    # Show results
     if st.session_state.matches:
         st.markdown('<div class="step-header">🎯 Transfer Results</div>', unsafe_allow_html=True)
-        summary_counts = {"Very Likely": 0, "Pretty Likely": 0, "Likely": 0, "Unlikely": 0}
+        summary = {'Very Likely': 0,'Pretty Likely': 0,'Likely': 0,'Unlikely': 0}
 
-        for idx, matches in st.session_state.matches.items():
-            ext_course = st.session_state.external_courses[idx]
-            st.write(f"## External Course {idx+1}: {ext_course['title']}")
-            best_score = 0
-            for rank, m in enumerate(matches, 1):
-                if m['score'] > best_score:
-                    best_score = m['score']
-                with st.expander(f"#{rank} {m['emoji']} {m['cat']} – {round(m['score']*100,1)}% → {m['code']}: {m['title']}"):
-                    c1, c2 = st.columns(2)
-                    c1.metric("Description Sim", f"{m['sim_desc']:.3f}")
-                    c1.metric("Title Sim", f"{m['sim_title']:.3f}")
-                    c2.metric("Final Score", f"{m['score']:.3f}")
-                    c2.metric("Transferability", m['cat'])
-                    st.write("**Catalog Description:**", m['description'])
-            if best_score >= 0.85:
-                summary_counts["Very Likely"] += 1
-            elif best_score >= 0.7:
-                summary_counts["Pretty Likely"] += 1
-            elif best_score >= 0.6:
-                summary_counts["Likely"] += 1
+        for idx, match_list in st.session_state.matches.items():
+            ext = st.session_state.external_courses[idx]
+            st.write(f"## External Course {idx+1}: {ext['title']}")
+            best = 0.0
+            for rank, m in enumerate(match_list, start=1):
+                best = max(best, m['score'])
+                label = f"#{rank} {m['emoji']} {m['cat']} – {m['score']*100:.1f}% → {m['code']}: {m['title']}"
+                with st.expander(label):
+                    a, b = st.columns(2)
+                    a.metric('Description Sim', f"{m['sim_desc']:.3f}")
+                    a.metric('Title Sim', f"{m['sim_title']:.3f}")
+                    b.metric('Final Score', f"{m['score']:.3f}")
+                    b.metric('Transferability', m['cat'])
+                    st.write('**Catalog Description:**', m['description'])
+            if best >= 0.85:
+                summary['Very Likely'] += 1
+            elif best >= 0.7:
+                summary['Pretty Likely'] += 1
+            elif best >= 0.6:
+                summary['Likely'] += 1
             else:
-                summary_counts["Unlikely"] += 1
-            st.markdown("---")
+                summary['Unlikely'] += 1
+            st.markdown('---')
 
-        st.write("## 📊 Final Course Transferability Summary")
+        st.write('## 📊 Final Course Transferability Summary')
         total = len(st.session_state.external_courses)
         c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("Total Input", total)
-        c2.metric("🟢 Very Likely", summary_counts["Very Likely"])
-        c3.metric("🔵 Pretty Likely", summary_counts["Pretty Likely"])
-        c4.metric("🟡 Likely", summary_counts["Likely"])
-        c5.metric("🔴 Unlikely", summary_counts["Unlikely"])
+        c1.metric('Total Input', total)
+        c2.metric('🟢 Very Likely', summary['Very Likely'])
+        c3.metric('🔵 Pretty Likely', summary['Pretty Likely'])
+        c4.metric('🟡 Likely', summary['Likely'])
+        c5.metric('🔴 Unlikely', summary['Unlikely'])
 
 if __name__ == "__main__":
     main()
