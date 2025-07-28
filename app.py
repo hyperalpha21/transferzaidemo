@@ -259,14 +259,18 @@ def main():
                     t = st.text_input("Title", key=f"t{i}", placeholder="e.g., Introduction to Psychology")
                     k = st.text_input("Keywords (optional)", key=f"k{i}", placeholder="e.g., cognitive, behavior, research")
                 with c2:
-                    # Cleaner placeholder (no weird None spacing)
+                    # ✅ FIXED safe parsing
                     level_choice = st.selectbox(
                         "Target Level",
                         ["Any Level", "100-level", "200-level", "300-level", "400-level"],
+                        index=0,
                         key=f"l{i}",
                         help="Choose level for better matching"
                     )
-                    l = None if level_choice == "Any Level" else int(level_choice.split("-")[0])
+                    if level_choice == "Any Level":
+                        l = None
+                    else:
+                        l = int(level_choice.split("-")[0])
                 d = st.text_area("Description", key=f"d{i}", height=100, placeholder="Detailed description of course content and objectives...")
                 if t and d:
                     external.append({'title': t, 'description': d, 'keywords': k, 'target_level': l})
