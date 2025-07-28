@@ -219,7 +219,7 @@ def main():
         file_to_load = None
         if src == "W&M Catalog" and os.path.exists("wm_courses_2025.csv"):
             file_to_load = "wm_courses_2025.csv"
-            st.info("Using wm_courses_2025.csv")
+            #st.info("Using wm_courses_2025.csv")
         else:
             uploaded = st.file_uploader("Upload Catalog CSV", type="csv")
             if uploaded:
