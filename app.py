@@ -257,11 +257,10 @@ def main():
             with st.expander(f"External Course {i+1}", expanded=(i == 0)):
                 c1, c2 = st.columns(2)
                 with c1:
-                    st.markdown(f'<label style="font-weight:600;">Title <span style="color:red; vertical-align:super;">*</span></label>', unsafe_allow_html=True); t = st.text_input("", key=f"t{i}", placeholder="e.g., Introduction to Psychology")
-                    st.markdown(f'<label style="font-weight:600;">Description <span style="color:red; vertical-align:super;">*</span></label>', unsafe_allow_html=True); d = st.text_area("", key=f"d{i}", height=100, placeholder="Detailed course description...")
                     t = st.text_input("Title (required)", key=f"t{i}", placeholder="e.g., Introduction to Psychology")
                     d = st.text_area("Description (required)", key=f"d{i}", height=100, placeholder="Detailed course description...")
                 with c2:
+                    k = st.text_input("Keywords (optional)", key=f"k{i}", placeholder="Additional keywords...")
                     level_choice = st.selectbox(
                         "Target Level",
                         ["Any Level", "100-level", "200-level", "300-level", "400-level"],
@@ -275,8 +274,6 @@ def main():
                         l = int(level_choice.split("-")[0])
                     else:
                         l = None
-                d = st.text_area("Description", key=f"d{i}", height=100, placeholder="Detailed course description...")
-                d = st.text_area("Description (required)", key=f"d{i}", height=100, placeholder="Detailed course description...")
                 if t and d:
                     external.append({'title': t, 'description': d, 'keywords': k, 'target_level': l})
         if external and st.button("🔍 Analyze", type="primary"):
