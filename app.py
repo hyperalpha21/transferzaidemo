@@ -115,7 +115,7 @@ def calculate_transferability_score(t1, d1, t2, d2, model):
     try:
         desc_embs = model.encode([d1, d2])
         sim_desc = cosine_similarity([desc_embs[0]], [desc_embs[1]])[0][0]
-        title_embs = model.encode([t1, t2])
+        title_embs = model.encode([t1, d2])
         sim_title = cosine_similarity([title_embs[0]], [title_embs[1]])[0][0]
         logit = -7.144 + 9.219 * sim_desc + 5.141 * sim_title
         return sim_desc, sim_title, 1 / (1 + math.exp(-logit))
@@ -190,6 +190,7 @@ def find_matches(external, model, df, embeddings):
 def main():
     init_state()
     st.markdown('<h1 class="main-header">🎓 TransferzAI</h1>', unsafe_allow_html=True)
+    st.info("Disclaimer: TransferzAI currently focuses primarily on matching **3–4 credit courses** (like lectures). 1–2 credit courses such as labs may have less certain results.")
 
     with st.sidebar:
         st.title("Controls")
@@ -232,8 +233,6 @@ def main():
                     if emb is not None:
                         st.session_state.courses_emb = emb
                         st.success(f"✅ Loaded {len(df)} courses")
-                        # Show disclaimer about credits
-                        st.info("ℹ️ **Note:** TransferzAI currently focuses on 3–4 credit main courses. 1–2 credit labs or workshops may have less certain transferability results.")
     else:
         st.info("Please start AI model first")
 
@@ -257,21 +256,23 @@ def main():
                 c1, c2 = st.columns(2)
                 with c1:
                     t = st.text_input("Title", key=f"t{i}", placeholder="e.g., Introduction to Psychology")
-                    k = st.text_input("Keywords (optional)", key=f"k{i}", placeholder="e.g., cognitive, behavior, research")
+                    k = st.text_input("Keywords", key=f"k{i}", placeholder="e.g., cognitive, behavior, research")
                 with c2:
-                    # ✅ FIXED safe parsing
                     level_choice = st.selectbox(
                         "Target Level",
                         ["Any Level", "100-level", "200-level", "300-level", "400-level"],
                         index=0,
                         key=f"l{i}",
-                        help="Choose level for better matching"
+                        help="Course level for better matching"
                     )
-                    if level_choice == "Any Level":
+                    # ✅ Safe parsing
+                    if not level_choice or level_choice == "Any Level":
                         l = None
-                    else:
+                    elif isinstance(level_choice, str) and "-" in level_choice:
                         l = int(level_choice.split("-")[0])
-                d = st.text_area("Description", key=f"d{i}", height=100, placeholder="Detailed description of course content and objectives...")
+                    else:
+                        l = None
+                d = st.text_area("Description", key=f"d{i}", height=100, placeholder="Detailed course description...")
                 if t and d:
                     external.append({'title': t, 'description': d, 'keywords': k, 'target_level': l})
         if external and st.button("🔍 Analyze", type="primary"):
@@ -301,7 +302,7 @@ def main():
                     c2.metric("Final Score", f"{m['score']:.3f}")
                     c2.metric("Transferability", m['cat'])
                     st.write("**Catalog Description:**", m['description'])
-            # classify once per course based on BEST match
+            # classify once per course
             if best_score >= 0.85:
                 summary_counts["Very Likely"] += 1
             elif best_score >= 0.7:
