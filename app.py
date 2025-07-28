@@ -230,7 +230,13 @@ def main():
                     t=st.text_input("Title",key=f"t{i}")
                     k=st.text_input("Keywords",key=f"k{i}")
                 with c2:
-                    l=st.selectbox("Target Level",[None,100,200,300,400],key=f"l{i}")
+                    l = st.selectbox(
+                            "Target Level",
+                            [None, 100, 200, 300, 400],
+                            key=f"l{i}",
+                            format_func=lambda x: "Any Level" if x is None else f"{x}-level",
+                            help="Course level for better matching"
+                            )
                 d=st.text_area("Description",key=f"d{i}",height=100)
                 if t and d: external.append({'title':t,'description':d,'keywords':k,'target_level':l})
         if external and st.button("🔍 Analyze",type="primary"):
