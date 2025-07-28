@@ -210,4 +210,7 @@ def main():
     # Sidebar reset
     with st.sidebar:
         st.title('Controls')
-        if st.button('Reset App'):\
+        if st.button('Reset App'):
+            for k in ["model", "courses_df", "courses_emb", "matches", "external_courses"]:
+                st.session_state[k] = {} if k == "matches" else None
+            st.rerun()
