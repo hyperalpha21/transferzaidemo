@@ -190,6 +190,13 @@ def find_matches(external, model, df, embeddings):
 def main():
     init_state()
     st.markdown('<h1 class="main-header">🎓 TransferzAI</h1>', unsafe_allow_html=True)
+    st.markdown("""
+    <div class='modern-card'>
+    <p>We use math and machine learning to estimate the transferability of a prospective student's courses based on their previous courses taken.</p>
+    <p>Simply load the model, upload a CSV file of your courses or use the built-in W&M catalog, then enter all student course titles and descriptions. You will be shown how many of the classes the student is bringing in are likely to transfer!</p>
+    </div>
+    """, unsafe_allow_html=True)
+
     st.info("Disclaimer: TransferzAI currently focuses primarily on matching **3–4 credit courses** (like lectures). 1–2 credit courses such as labs may have less certain results.")
 
     with st.sidebar:
@@ -199,7 +206,6 @@ def main():
                 st.session_state[k] = None if k != "matches" else {}
             st.rerun()
 
-    # Load model
     if not st.session_state.model:
         st.write("### 🤖 Load AI Model")
         if st.button("Start AI Model"):
@@ -212,14 +218,12 @@ def main():
     else:
         st.write("✅ **Model Loaded**")
 
-    # Load catalog
     st.markdown('<div class="step-header">📁 Load Course Catalog</div>', unsafe_allow_html=True)
     if st.session_state.model:
         src = st.radio("Source", ["W&M Catalog", "Upload CSV"])
         file_to_load = None
         if src == "W&M Catalog" and os.path.exists("wm_courses_2025.csv"):
             file_to_load = "wm_courses_2025.csv"
-            #st.info("Using wm_courses_2025.csv")
         else:
             uploaded = st.file_uploader("Upload Catalog CSV", type="csv")
             if uploaded:
@@ -236,7 +240,6 @@ def main():
     else:
         st.info("Please start AI model first")
 
-    # Catalog preview
     if st.session_state.courses_df is not None:
         df = st.session_state.courses_df
         col1, col2, col3 = st.columns(3)
@@ -246,10 +249,9 @@ def main():
         with st.expander("Preview Catalog"):
             st.dataframe(df[['course_code', 'course_title', 'level']].head())
 
-    # External courses input
     if st.session_state.courses_df is not None and st.session_state.courses_emb is not None:
         st.markdown('<div class="step-header">📚 Add External Courses</div>', unsafe_allow_html=True)
-        n = st.slider("How many external courses?", 1, 5, 2)
+        n = st.slider("How many external courses?", 1, 15, 2)
         external = []
         for i in range(n):
             with st.expander(f"External Course {i+1}", expanded=(i == 0)):
@@ -265,7 +267,6 @@ def main():
                         key=f"l{i}",
                         help="Course level for better matching"
                     )
-                    # ✅ Safe parsing
                     if not level_choice or level_choice == "Any Level":
                         l = None
                     elif isinstance(level_choice, str) and "-" in level_choice:
@@ -283,7 +284,6 @@ def main():
                 st.success("✅ Analysis complete!")
                 st.rerun()
 
-    # Results
     if st.session_state.matches:
         st.markdown('<div class="step-header">🎯 Transfer Results</div>', unsafe_allow_html=True)
         summary_counts = {"Very Likely": 0, "Pretty Likely": 0, "Likely": 0, "Unlikely": 0}
@@ -302,7 +302,6 @@ def main():
                     c2.metric("Final Score", f"{m['score']:.3f}")
                     c2.metric("Transferability", m['cat'])
                     st.write("**Catalog Description:**", m['description'])
-            # classify once per course
             if best_score >= 0.85:
                 summary_counts["Very Likely"] += 1
             elif best_score >= 0.7:
@@ -313,7 +312,6 @@ def main():
                 summary_counts["Unlikely"] += 1
             st.markdown("---")
 
-        # ✅ Final summary
         st.write("## 📊 Final Course Transferability Summary")
         total = len(st.session_state.external_courses)
         c1, c2, c3, c4, c5 = st.columns(5)
