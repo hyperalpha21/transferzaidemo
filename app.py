@@ -197,7 +197,7 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    st.info("Disclaimer: TransferzAI currently focuses primarily on matching **3–4 credit courses** (like lectures). 1–2 credit courses such as labs may have less certain results.")
+    st.info("Disclaimer: TransferzAI currently focuses primarily on matching **3–4 credit courses** (like lectures). 1–2 credit courses such as labs may have less certain results. TransferzAI also does not guarantee 100% accurate results nor does it replace University Registrar. Only the University will provide fully certified results.")
 
     with st.sidebar:
         st.title("Controls")
