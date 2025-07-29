@@ -207,7 +207,7 @@ def main():
     st.markdown('<h1 class="main-header">🎓 TransferzAI</h1>', unsafe_allow_html=True)
     st.markdown("""
     <div class='modern-card'>
-    <p>We use math and machine learning to estimate the transferability of a prospective student's courses based on their previous courses taken.</p>
+    <p>This tool uses math to estimate the transferability of a prospective student's courses based on their previous courses taken.</p>
     <p>Simply load the model, upload a CSV file of your courses or use the built-in W&M catalog, then enter all student course titles and descriptions. You will be shown how many of the classes the student is bringing in are likely to transfer!</p>
     </div>
     """, unsafe_allow_html=True)
