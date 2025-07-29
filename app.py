@@ -123,10 +123,12 @@ def calculate_transferability_score(t1, d1, t2, d2, model):
         return 0, 0, 0
 
 def classify_score(score):
-    if score >= 0.8:
+    if score >= 0.7612713:
         return "Very Likely", "🟢"
     elif score >= 0.6649266:
         return "Likely", "🟡"
+    elif score >= 0.4340521:
+        return "Potentially", "🟠"
     else:
         return "Unlikely", "🔴"
 
@@ -284,7 +286,7 @@ def main():
 
     if st.session_state.matches:
         st.markdown('<div class="step-header">🎯 Transfer Results</div>', unsafe_allow_html=True)
-        summary_counts = {"Very Likely": 0, "Pretty Likely": 0, "Likely": 0, "Unlikely": 0}
+        summary_counts = {"Very Likely": 0, "Likely": 0, "Potentially": 0, "Unlikely": 0}
 
         for idx, matches in st.session_state.matches.items():
             ext_course = st.session_state.external_courses[idx]
@@ -300,14 +302,8 @@ def main():
                     c2.metric("Final Score", f"{m['score']:.3f}")
                     c2.metric("Transferability", m['cat'])
                     st.write("**Catalog Description:**", m['description'])
-            if best_score >= 0.85:
-                summary_counts["Very Likely"] += 1
-            elif best_score >= 0.7:
-                summary_counts["Pretty Likely"] += 1
-            elif best_score >= 0.6:
-                summary_counts["Likely"] += 1
-            else:
-                summary_counts["Unlikely"] += 1
+            cat, _ = classify_score(best_score)
+            summary_counts[cat] += 1
             st.markdown("---")
 
         st.write("## 📊 Final Course Transferability Summary")
@@ -315,8 +311,8 @@ def main():
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("Total Input", total)
         c2.metric("🟢 Very Likely", summary_counts["Very Likely"])
-        c3.metric("🔵 Pretty Likely", summary_counts["Pretty Likely"])
-        c4.metric("🟡 Likely", summary_counts["Likely"])
+        c3.metric("🟡 Likely", summary_counts["Likely"])
+        c4.metric("🟠 Potentially", summary_counts["Potentially"])
         c5.metric("🔴 Unlikely", summary_counts["Unlikely"])
 
 if __name__ == "__main__":
