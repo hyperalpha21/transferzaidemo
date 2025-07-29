@@ -123,11 +123,9 @@ def calculate_transferability_score(t1, d1, t2, d2, model):
         return 0, 0, 0
 
 def classify_score(score):
-    if score >= 0.85:
+    if score >= 0.8:
         return "Very Likely", "🟢"
-    elif score >= 0.7:
-        return "Pretty Likely", "🔵"
-    elif score >= 0.6:
+    elif score >= 0.6649266:
         return "Likely", "🟡"
     else:
         return "Unlikely", "🔴"
