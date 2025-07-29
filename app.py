@@ -125,11 +125,11 @@ def calculate_transferability_score(t1, d1, t2, d2, model):
     return sim_desc, sim_title, prob
 
 def classify_score(score):
-    if score >= 0.7612713:
+    if score >= 0.738338:
         return "Very Likely", "🟢"
-    elif score >= 0.6649266:
+    elif score >= 0.5842154:
         return "Likely", "🟡"
-    elif score >= 0.4340521:
+    elif score >= 0.475791:
         return "Potentially", "🟠"
     else:
         return "Unlikely", "🔴"
@@ -161,17 +161,25 @@ def find_matches(external, model, df, embeddings):
     results = {}
     for idx, course in enumerate(external):
         title, desc, kw, lvl = course['title'], course['description'], course['keywords'], course['target_level']
+
+        # ------------- candidate pool by cosine sim -------------
         ext_text = f"{title} {desc} {kw}" if kw else f"{title} {desc}"
-        ext_emb = model.encode([ext_text])
-        sims = cosine_similarity(ext_emb, embeddings)[0]
+        ext_emb  = model.encode([ext_text])
+        sims     = cosine_similarity(ext_emb, embeddings)[0]
+
         if lvl:
             sims += df['level'].apply(lambda x: level_bonus(x, lvl)).values
-        top_idx = np.argpartition(sims, -5)[-5:]
-        sorted_idx = top_idx[np.argsort(sims[top_idx])[::-1]]
+
+        top_idx     = np.argpartition(sims, -5)[-5:]          # top‑5 by similarity
+        sorted_idx  = top_idx[np.argsort(sims[top_idx])[::-1]]
+
+        # ------------- now compute probabilities -------------
         matches = []
         for i in sorted_idx:
             row = df.iloc[i]
-            sdesc, stitle, score = calculate_transferability_score(title, desc, row['course_title'], row['course_description'], model)
+            sdesc, stitle, score = calculate_transferability_score(
+                title, desc, row['course_title'], row['course_description'], model
+            )
             cat, emoji = classify_score(score)
             matches.append({
                 "code": row['course_code'],
@@ -183,8 +191,13 @@ def find_matches(external, model, df, embeddings):
                 "sim_title": stitle,
                 "description": row['course_description'][:200] + "..."
             })
+
+        # 🔑 NEW LINE – order by probability, highest first
+        matches.sort(key=lambda m: m['score'], reverse=True)
+
         results[idx] = matches
     return results
+
 
 # =======================
 # UI
