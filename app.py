@@ -120,7 +120,7 @@ def calculate_transferability_score(t1, d1, t2, d2, model):
     title_embs = model.encode([t1, t2])
     sim_title  = cosine_similarity(title_embs[:1], title_embs[1:])[0][0]
 
-    logit = -7.144 + 9.219*sim_desc + 5.141*sim_title
+    logit = -4.123 + 5.545*sim_desc + 3.401*sim_title
     prob  = 1/(1+math.exp(-logit))
     return sim_desc, sim_title, prob
 
