@@ -112,15 +112,17 @@ def level_bonus(orig, target):
     return 0.15 if d == 0 else 0.12 if d == 100 else 0.02 if d == 200 else 0.0
 
 def calculate_transferability_score(t1, d1, t2, d2, model):
-    try:
-        desc_embs = model.encode([d1, d2])
-        sim_desc = cosine_similarity([desc_embs[0]], [desc_embs[1]])[0][0]
-        title_embs = model.encode([t1, d2])
-        sim_title = cosine_similarity([title_embs[0]], [title_embs[1]])[0][0]
-        logit = -7.144 + 9.219 * sim_desc + 5.141 * sim_title
-        return sim_desc, sim_title, 1 / (1 + math.exp(-logit))
-    except:
-        return 0, 0, 0
+    # description similarity
+    desc_embs = model.encode([d1, d2])
+    sim_desc  = cosine_similarity(desc_embs[:1], desc_embs[1:])[0][0]
+
+    # title similarity   ✅ now title ↔ title
+    title_embs = model.encode([t1, t2])
+    sim_title  = cosine_similarity(title_embs[:1], title_embs[1:])[0][0]
+
+    logit = -7.144 + 9.219*sim_desc + 5.141*sim_title
+    prob  = 1/(1+math.exp(-logit))
+    return sim_desc, sim_title, prob
 
 def classify_score(score):
     if score >= 0.7612713:
